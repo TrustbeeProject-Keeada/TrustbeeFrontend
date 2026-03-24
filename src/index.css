@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 150 30% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 150 30% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 30% 10%;
+
+    --primary: 152 55% 22%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 148 20% 94%;
+    --secondary-foreground: 152 55% 22%;
+
+    --muted: 148 15% 94%;
+    --muted-foreground: 150 10% 45%;
+
+    --accent: 40 72% 52%;
+    --accent-foreground: 150 30% 10%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 148 15% 88%;
+    --input: 148 15% 88%;
+    --ring: 152 55% 22%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 148 15% 97%;
+    --sidebar-foreground: 150 15% 30%;
+    --sidebar-primary: 152 55% 22%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 148 15% 94%;
+    --sidebar-accent-foreground: 152 55% 22%;
+    --sidebar-border: 148 15% 90%;
+    --sidebar-ring: 152 55% 22%;
+  }
+
+  .dark {
+    --background: 0 0% 0%;
+    --foreground: 148 15% 92%;
+
+    --card: 150 15% 5%;
+    --card-foreground: 148 15% 92%;
+
+    --popover: 150 15% 5%;
+    --popover-foreground: 148 15% 92%;
+
+    --primary: 152 55% 28%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 150 15% 10%;
+    --secondary-foreground: 148 15% 92%;
+
+    --muted: 150 12% 12%;
+    --muted-foreground: 148 10% 55%;
+
+    --accent: 40 72% 52%;
+    --accent-foreground: 0 0% 0%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 150 12% 14%;
+    --input: 150 12% 14%;
+    --ring: 152 55% 28%;
+
+    --sidebar-background: 150 15% 4%;
+    --sidebar-foreground: 148 15% 85%;
+    --sidebar-primary: 152 55% 28%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 150 12% 10%;
+    --sidebar-accent-foreground: 148 15% 85%;
+    --sidebar-border: 150 12% 12%;
+    --sidebar-ring: 152 55% 28%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/60 dark:bg-white/5 backdrop-blur-xl border border-white/20 dark:border-white/10;
+  }
+
+  .glass-strong {
+    @apply bg-white/80 dark:bg-white/5 backdrop-blur-2xl border border-white/30 dark:border-white/10;
+  }
+}
