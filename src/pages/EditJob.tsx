@@ -36,19 +36,15 @@ export default function EditJob() {
     );
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      await updateJob(job.id, {
-        title, company, description, requirements, type, education,
-        country, city, salaryMin, salaryMax,
-        location: `${city}, ${country}`,
-      });
-      toast.success("Job updated successfully");
-      navigate("/manage-jobs");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update job");
-    }
+    updateJob(job.id, {
+      title, company, description, requirements, type, education,
+      country, city, salaryMin, salaryMax,
+      location: `${city}, ${country}`,
+    });
+    toast.success("Job updated successfully");
+    navigate("/manage-jobs");
   };
 
   return (
@@ -57,7 +53,6 @@ export default function EditJob() {
         <h1 className="text-3xl font-bold">Edit Job</h1>
         <p className="mt-1 text-muted-foreground">Update your job listing details.</p>
       </ScrollReveal>
-
       <ScrollReveal delay={80}>
         <Card className="glass mt-8">
           <CardHeader><CardTitle>Job Details</CardTitle></CardHeader>
@@ -68,30 +63,8 @@ export default function EditJob() {
               <div className="space-y-2"><Label>Description</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5} /></div>
               <div className="space-y-2"><Label>Requirements</Label><Textarea value={requirements} onChange={(e) => setRequirements(e.target.value)} rows={4} /></div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Job Type</Label>
-                  <Select value={type} onValueChange={setType}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Full-time">Full-time</SelectItem>
-                      <SelectItem value="Part-time">Part-time</SelectItem>
-                      <SelectItem value="Contract">Contract</SelectItem>
-                      <SelectItem value="Remote">Remote</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Education Level</Label>
-                  <Select value={education} onValueChange={setEducation}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Any">Any</SelectItem>
-                      <SelectItem value="BSc">BSc</SelectItem>
-                      <SelectItem value="MSc">MSc</SelectItem>
-                      <SelectItem value="MBA">MBA</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <div className="space-y-2"><Label>Job Type</Label><Select value={type} onValueChange={setType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Full-time">Full-time</SelectItem><SelectItem value="Part-time">Part-time</SelectItem><SelectItem value="Contract">Contract</SelectItem><SelectItem value="Remote">Remote</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2"><Label>Education Level</Label><Select value={education} onValueChange={setEducation}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Any">Any</SelectItem><SelectItem value="BSc">BSc</SelectItem><SelectItem value="MSc">MSc</SelectItem><SelectItem value="MBA">MBA</SelectItem></SelectContent></Select></div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2"><Label>Country</Label><Input value={country} onChange={(e) => setCountry(e.target.value)} /></div>

@@ -24,34 +24,28 @@ export default function Profile() {
   const [portfolioUrl, setPortfolioUrl] = useState(user?.portfolioUrl || "");
   const [linkedinUrl, setLinkedinUrl] = useState(user?.linkedinUrl || "");
   const [githubUrl, setGithubUrl] = useState(user?.githubUrl || "");
-  const [saving, setSaving] = useState(false);
 
   const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
     try {
-      // TODO: Replace updateProfile with your backend API call
-      await updateProfile({
-        firstName,
-        lastName,
-        phone,
-        country,
-        city,
-        status,
-        experience,
-        education,
-        portfolioUrl,
-        linkedinUrl,
-        githubUrl,
+      updateProfile({
+        firstName, lastName, phone, country, city, status,
+        experience, education, portfolioUrl, linkedinUrl, githubUrl,
       });
       toast.success("Profile updated!");
     } catch (err: any) {
       toast.error(err.message || "Failed to save");
-    } finally {
-      setSaving(false);
     }
+  };
+
+  const handleCvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    updateProfile({ cvText: text });
+    toast.success("CV uploaded and parsed for job matching!");
   };
 
   return (
@@ -118,7 +112,7 @@ export default function Profile() {
           <Card className="glass">
             <CardHeader><CardTitle className="flex items-center gap-2"><GraduationCap className="h-4 w-4" /> Experience & Education</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2"><Label>Work Experience</Label><Textarea placeholder="Describe your past roles…" rows={4} value={experience} onChange={(e) => setExperience(e.target.value)} /></div>
+              <div className="space-y-2"><Label>Work Experience</Label><Textarea placeholder="Describe your past roles, skills, technologies…" rows={4} value={experience} onChange={(e) => setExperience(e.target.value)} /></div>
               <div className="space-y-2"><Label>Education / Degree</Label><Input placeholder="e.g., BSc Computer Science, KTH" value={education} onChange={(e) => setEducation(e.target.value)} /></div>
             </CardContent>
           </Card>
@@ -129,9 +123,9 @@ export default function Profile() {
             <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4" /> Resume & Portfolio</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Upload CV (PDF)</Label>
-                {/* TODO: Wire to backend file upload: await fetch('/api/upload/cv', { method: 'POST', body: formData }) */}
-                <Input type="file" accept=".pdf" />
+                <Label>Upload CV (PDF/TXT)</Label>
+                <Input type="file" accept=".pdf,.txt,.doc,.docx" onChange={handleCvUpload} />
+                <p className="text-xs text-muted-foreground">Your CV text will be used for AI job matching on the Jobs page.</p>
               </div>
               <div className="space-y-2"><Label>Portfolio URL</Label><Input placeholder="https://myportfolio.com" value={portfolioUrl} onChange={(e) => setPortfolioUrl(e.target.value)} /></div>
             </CardContent>
@@ -149,8 +143,8 @@ export default function Profile() {
         </ScrollReveal>
 
         <ScrollReveal delay={280}>
-          <Button type="submit" size="lg" disabled={saving} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.97] transition-transform">
-            {saving ? "Saving…" : "Save Changes"}
+          <Button type="submit" size="lg" className="w-full bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.97] transition-transform">
+            Save Changes
           </Button>
         </ScrollReveal>
       </form>

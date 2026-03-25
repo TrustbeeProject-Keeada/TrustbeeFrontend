@@ -27,32 +27,23 @@ export default function CreateJob() {
   const [salaryMin, setSalaryMin] = useState("");
   const [salaryMax, setSalaryMax] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !company || !description) {
       toast.error("Please fill in title, company, and description");
       return;
     }
-    try {
-      await createJob({
-        title,
-        company,
-        description,
-        requirements,
-        type: type || "Full-time",
-        education: education || "Any",
-        country,
-        city,
-        location: `${city}, ${country}`,
-        salaryMin,
-        salaryMax,
-        employerId: user?.id || "",
-      });
-      toast.success("Job published!");
-      navigate("/manage-jobs");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create job");
-    }
+    createJob({
+      title, company, description, requirements,
+      type: type || "Full-time",
+      education: education || "Any",
+      country, city,
+      location: `${city}, ${country}`,
+      salaryMin, salaryMax,
+      employerId: user?.id || "",
+    });
+    toast.success("Job published!");
+    navigate("/manage-jobs");
   };
 
   return (
@@ -61,7 +52,6 @@ export default function CreateJob() {
         <h1 className="text-3xl font-bold">Post a Job</h1>
         <p className="mt-1 text-muted-foreground">Create a new job listing for candidates to discover.</p>
       </ScrollReveal>
-
       <ScrollReveal delay={80}>
         <Card className="glass mt-8">
           <CardHeader><CardTitle>Job Details</CardTitle></CardHeader>
