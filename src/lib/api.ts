@@ -1,10 +1,12 @@
 /**
- * TrustBee — Pure localStorage data layer (no backend needed).
- * Deploy anywhere: Vercel, Netlify, GitHub Pages, etc.
+ * TrustBee — localStorage data layer + demo API fire-and-forget requests.
+ * Every operation persists locally AND sends a fetch to the demo API.
  */
 
-// ━━━ Types ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━ Demo API base URL ━━━━━━━━━━━━━━━━━━━━━━━━━━
+const API_BASE = "https://demo-api.trustbee.example/v1";
 
+// ━━━ Types ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export type UserRole = "job_seeker" | "employer";
 
 export interface User {
@@ -19,7 +21,7 @@ export interface User {
   status?: string;
   experience?: string;
   education?: string;
-  cvText?: string; // extracted CV text for matchmaking
+  cvText?: string;
   portfolioUrl?: string;
   linkedinUrl?: string;
   githubUrl?: string;
@@ -42,6 +44,12 @@ export interface Job {
   salaryMax: string;
   posted: string;
   employerId: string;
+  logo?: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
 }
 
 export interface RegisterRequest {
@@ -59,14 +67,47 @@ export interface RegisterRequest {
 
 export type UpdateProfileRequest = Partial<Omit<User, "id" | "email">>;
 
-// ━━━ Storage keys ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+export interface CreateJobRequest {
+  title: string;
+  company: string;
+  description: string;
+  requirements: string;
+  location: string;
+  country: string;
+  city: string;
+  type: string;
+  education: string;
+  salaryMin: string;
+  salaryMax: string;
+}
 
+export interface CvUploadRequest {
+  userId: string;
+  cvText: string;
+  fileName: string;
+}
+
+// ━━━ Storage keys ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const USERS_KEY = "trustbee_users";
 const USER_KEY = "trustbee_user";
 const JOBS_KEY = "trustbee_jobs";
 
-// ━━━ Default seed data ━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━ Demo API helper (fire-and-forget) ━━━━━━━━━━
+function apiCall(endpoint: string, options: RequestInit = {}) {
+  const token = localStorage.getItem("trustbee_token");
+  fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  }).catch(() => {
+    // Demo URL — silently ignore network errors
+  });
+}
 
+// ━━━ Default seed data ━━━━━━━━━━━━━━━━━━━━━━━━━━
 const defaultJobs: Job[] = [
   { id: "1", title: "Senior Frontend Developer", company: "Spotify", location: "Stockholm, Sweden", country: "Sweden", city: "Stockholm", type: "Full-time", salaryMin: "65000", salaryMax: "85000", posted: "2d ago", education: "BSc", description: "Build amazing web experiences with React and TypeScript. You'll work on the Spotify Web Player, collaborating with designers and backend engineers.", requirements: "5+ years React\nTypeScript proficiency\nDesign system experience\nCSS/Tailwind\nGit & CI/CD", employerId: "" },
   { id: "2", title: "UX Designer", company: "Klarna", location: "Stockholm, Sweden", country: "Sweden", city: "Stockholm", type: "Full-time", salaryMin: "50000", salaryMax: "70000", posted: "3d ago", education: "Any", description: "Design intuitive user experiences for fintech products used by millions worldwide.", requirements: "Figma expertise\nUser research skills\nPrototyping\nDesign thinking\nCollaboration", employerId: "" },
@@ -77,10 +118,15 @@ const defaultJobs: Job[] = [
 ];
 
 // ━━━ Data helpers ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 export const db = {
-  // Auth
-  login(email: string, _password: string): User {
+  // ── Auth ──────────────────────────────────────
+  login(email: string, password: string): User {
+    // Fire API request
+    apiCall("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password } as LoginRequest),
+    });
+
     const users: User[] = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
     const found = users.find((u) => u.email === email);
     if (!found) throw new Error("Invalid email or password");
@@ -89,6 +135,12 @@ export const db = {
   },
 
   register(data: RegisterRequest): User {
+    // Fire API request
+    apiCall("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+
     const users: User[] = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
     if (users.find((u) => u.email === data.email)) throw new Error("Email already registered");
     const newUser: User = {
@@ -115,10 +167,18 @@ export const db = {
   },
 
   logout() {
+    apiCall("/auth/logout", { method: "POST" });
     localStorage.removeItem(USER_KEY);
   },
 
+  // ── Profile ──────────────────────────────────
   updateProfile(user: User, data: UpdateProfileRequest): User {
+    // Fire API request
+    apiCall(`/profile/${user.id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+
     const updated = { ...user, ...data };
     localStorage.setItem(USER_KEY, JSON.stringify(updated));
     const users: User[] = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
@@ -130,13 +190,70 @@ export const db = {
     return updated;
   },
 
-  // Jobs
+  // ── CV Upload ────────────────────────────────
+  uploadCv(userId: string, cvText: string, fileName: string): void {
+    apiCall("/profile/cv", {
+      method: "POST",
+      body: JSON.stringify({ userId, cvText, fileName } as CvUploadRequest),
+    });
+  },
+
+  // ── Jobs ─────────────────────────────────────
   loadJobs(): Job[] {
+    // Fire API request to fetch jobs
+    apiCall("/jobs", { method: "GET" });
+
     const stored = localStorage.getItem(JOBS_KEY);
     return stored ? JSON.parse(stored) : defaultJobs;
   },
 
   saveJobs(jobs: Job[]) {
     localStorage.setItem(JOBS_KEY, JSON.stringify(jobs));
+  },
+
+  createJob(data: Omit<Job, "id" | "posted">): Job {
+    const newJob: Job = { ...data, id: crypto.randomUUID(), posted: "Just now" };
+
+    // Fire API request
+    apiCall("/jobs", {
+      method: "POST",
+      body: JSON.stringify(newJob),
+    });
+
+    const jobs = this.loadJobs();
+    const updated = [newJob, ...jobs];
+    this.saveJobs(updated);
+    return newJob;
+  },
+
+  updateJob(id: string, data: Partial<Job>): Job[] {
+    // Fire API request
+    apiCall(`/jobs/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+
+    const jobs = this.loadJobs();
+    const updated = jobs.map((j) => (j.id === id ? { ...j, ...data } : j));
+    this.saveJobs(updated);
+    return updated;
+  },
+
+  deleteJob(id: string): Job[] {
+    // Fire API request
+    apiCall(`/jobs/${id}`, { method: "DELETE" });
+
+    const jobs = this.loadJobs();
+    const updated = jobs.filter((j) => j.id !== id);
+    this.saveJobs(updated);
+    return updated;
+  },
+
+  getJob(id: string): Job | undefined {
+    // Fire API request
+    apiCall(`/jobs/${id}`, { method: "GET" });
+
+    const jobs = this.loadJobs();
+    return jobs.find((j) => j.id === id);
   },
 };

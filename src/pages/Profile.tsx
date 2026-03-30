@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Camera, Briefcase, GraduationCap, Globe, FileText, Linkedin, Github } from "lucide-react";
+import { db } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,8 +43,13 @@ export default function Profile() {
 
   const handleCvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
     const text = await file.text();
+
+    // Send CV to demo API
+    db.uploadCv(user.id, text, file.name);
+
+    // Update local profile
     updateProfile({ cvText: text });
     toast.success("CV uploaded and parsed for job matching!");
   };

@@ -10,6 +10,7 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useJobs } from "@/contexts/JobContext";
 import { toast } from "sonner";
+import { Upload, X } from "lucide-react";
 
 export default function CreateJob() {
   const { user } = useAuth();
@@ -26,6 +27,21 @@ export default function CreateJob() {
   const [city, setCity] = useState("");
   const [salaryMin, setSalaryMin] = useState("");
   const [salaryMax, setSalaryMax] = useState("");
+  const [logo, setLogo] = useState("");
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Logo must be under 2MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setLogo(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +56,7 @@ export default function CreateJob() {
       country, city,
       location: `${city}, ${country}`,
       salaryMin, salaryMax,
+      logo,
       employerId: user?.id || "",
     });
     toast.success("Job published!");
@@ -57,6 +74,31 @@ export default function CreateJob() {
           <CardHeader><CardTitle>Job Details</CardTitle></CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={handleSubmit}>
+              {/* Company Logo */}
+              <div className="space-y-2">
+                <Label>Company Logo</Label>
+                <div className="flex items-center gap-4">
+                  {logo ? (
+                    <div className="relative">
+                      <img src={logo} alt="Logo preview" className="h-16 w-16 rounded-lg object-cover border border-border" />
+                      <button
+                        type="button"
+                        onClick={() => setLogo("")}
+                        className="absolute -top-2 -right-2 rounded-full bg-destructive p-1 text-destructive-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-accent transition-colors">
+                      <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                      <Upload className="h-5 w-5 text-muted-foreground" />
+                    </label>
+                  )}
+                  <span className="text-xs text-muted-foreground">PNG, JPG up to 2MB</span>
+                </div>
+              </div>
+
               <div className="space-y-2"><Label>Job Title</Label><Input placeholder="e.g., Senior Frontend Developer" value={title} onChange={(e) => setTitle(e.target.value)} /></div>
               <div className="space-y-2"><Label>Company Name</Label><Input placeholder="Your company" value={company} onChange={(e) => setCompany(e.target.value)} /></div>
               <div className="space-y-2"><Label>Description</Label><Textarea placeholder="Describe the role, responsibilities, and team…" rows={5} value={description} onChange={(e) => setDescription(e.target.value)} /></div>

@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import { useJobs } from "@/contexts/JobContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { rankJobs } from "@/lib/matchmaker";
+import { db } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function Jobs() {
@@ -18,26 +19,33 @@ export default function Jobs() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [countryFilter, setCountryFilter] = useState("all");
   const [showMatches, setShowMatches] = useState(false);
+  const [cvKey, setCvKey] = useState(0); // force re-rank after CV upload
 
-  // Parse CV file to extract text for matchmaking
   const handleCvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const text = await file.text();
-    // For PDF, we read raw text (works for text-based PDFs)
-    // For better results, users can paste their CV text in their profile
-    if (user) {
-      updateProfile({ cvText: text });
-      toast.success("CV uploaded! Job matches updated.");
-      setShowMatches(true);
-    } else {
+    if (!user) {
       toast.error("Please log in to use job matching.");
+      return;
     }
+
+    const text = await file.text();
+
+    // Send CV to demo API
+    db.uploadCv(user.id, text, file.name);
+
+    // Update local profile with CV text
+    updateProfile({ cvText: text });
+
+    // Auto-enable matching
+    setShowMatches(true);
+    setCvKey((k) => k + 1);
+    toast.success("CV uploaded! Job matches updated.");
   };
 
   const filtered = useMemo(() => {
-    let result = jobs.filter((j) => {
+    return jobs.filter((j) => {
       const matchesSearch =
         j.title.toLowerCase().includes(search.toLowerCase()) ||
         j.company.toLowerCase().includes(search.toLowerCase());
@@ -45,13 +53,13 @@ export default function Jobs() {
       const matchesCountry = countryFilter === "all" || j.country === countryFilter;
       return matchesSearch && matchesType && matchesCountry;
     });
-    return result;
   }, [jobs, search, typeFilter, countryFilter]);
 
   const ranked = useMemo(() => {
     if (showMatches && user) return rankJobs(user, filtered);
     return filtered.map((job) => ({ job, score: 0 }));
-  }, [filtered, showMatches, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, showMatches, user, cvKey]);
 
   const hasCvData = !!(user?.cvText || user?.experience || user?.education);
 
@@ -101,8 +109,8 @@ export default function Jobs() {
             <div className="ml-auto flex items-center gap-2">
               <label className="cursor-pointer">
                 <input type="file" accept=".pdf,.txt,.doc,.docx" className="hidden" onChange={handleCvUpload} />
-                <Button variant="outline" size="sm" className="gap-1.5 pointer-events-none">
-                  <Upload className="h-3.5 w-3.5" /> Upload CV
+                <Button variant="outline" size="sm" className="gap-1.5 pointer-events-none" asChild>
+                  <span><Upload className="h-3.5 w-3.5" /> Upload CV</span>
                 </Button>
               </label>
               {hasCvData && (
@@ -126,9 +134,13 @@ export default function Jobs() {
           <ScrollReveal key={job.id} delay={i * 60}>
             <Card className="glass transition-shadow hover:shadow-md">
               <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-                  {job.company.slice(0, 2).toUpperCase()}
-                </div>
+                {job.logo ? (
+                  <img src={job.logo} alt={job.company} className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+                ) : (
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                    {job.company.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold truncate">{job.title}</h3>
