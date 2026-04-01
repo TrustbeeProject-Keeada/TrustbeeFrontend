@@ -21,6 +21,14 @@ export default function Jobs() {
   const [showMatches, setShowMatches] = useState(false);
   const [cvKey, setCvKey] = useState(0); // force re-rank after CV upload
 
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
   const handleCvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -30,12 +38,13 @@ export default function Jobs() {
       return;
     }
 
+    const base64 = await fileToBase64(file);
     const text = await file.text();
 
-    // Send CV to demo API
-    db.uploadCv(user.id, text, file.name);
+    // Send base64 file to backend
+    db.uploadCv(user.id, base64, file.name);
 
-    // Update local profile with CV text
+    // Update local profile with CV text for matching
     updateProfile({ cvText: text });
 
     // Auto-enable matching

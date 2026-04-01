@@ -190,11 +190,11 @@ export const db = {
     return updated;
   },
 
-  // ── CV Upload ────────────────────────────────
-  uploadCv(userId: string, cvText: string, fileName: string): void {
+  // ── CV Upload (base64) ────────────────────────
+  uploadCv(userId: string, base64File: string, fileName: string): void {
     apiCall("/profile/cv", {
       method: "POST",
-      body: JSON.stringify({ userId, cvText, fileName } as CvUploadRequest),
+      body: JSON.stringify({ userId, file: base64File, fileName }),
     });
   },
 
