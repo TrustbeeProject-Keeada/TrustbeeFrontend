@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Search, MapPin, Briefcase, GraduationCap, Bookmark, ChevronRight, Sparkles, Upload } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, MapPin, Briefcase, Bookmark, ChevronRight, ChevronLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,94 +8,62 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import { Link } from "react-router-dom";
 import { useJobs } from "@/contexts/JobContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { rankJobs } from "@/lib/matchmaker";
-import { db } from "@/lib/api";
+import { useSaved } from "@/contexts/SavedContext";
 import { toast } from "sonner";
 
 export default function Jobs() {
-  const { jobs } = useJobs();
-  const { user, updateProfile } = useAuth();
+  const { jobs, totalJobs, currentPage, totalPages, loading, fetchJobs } = useJobs();
+  const { user } = useAuth();
+  const { isJobSaved, toggleSaveJob } = useSaved();
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
   const [countryFilter, setCountryFilter] = useState("all");
-  const [showMatches, setShowMatches] = useState(false);
-  const [cvKey, setCvKey] = useState(0); // force re-rank after CV upload
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [page, setPage] = useState(1);
 
-  const fileToBase64 = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+  useEffect(() => {
+    fetchJobs({
+      search: search || undefined,
+      country: countryFilter !== "all" ? countryFilter : undefined,
+      category: categoryFilter !== "all" ? categoryFilter : undefined,
+      page,
+      limit: 10,
     });
+  }, [search, countryFilter, categoryFilter, page, fetchJobs]);
 
-  const handleCvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const handleSave = async (jobId: number) => {
     if (!user) {
-      toast.error("Please log in to use job matching.");
+      toast.error("Please log in to save jobs");
       return;
     }
-
-    const base64 = await fileToBase64(file);
-    const text = await file.text();
-
-    // Send base64 file to backend
-    db.uploadCv(user.id, base64, file.name);
-
-    // Update local profile with CV text for matching
-    updateProfile({ cvText: text });
-
-    // Auto-enable matching
-    setShowMatches(true);
-    setCvKey((k) => k + 1);
-    toast.success("CV uploaded! Job matches updated.");
+    try {
+      await toggleSaveJob(jobId);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save job");
+    }
   };
-
-  const filtered = useMemo(() => {
-    return jobs.filter((j) => {
-      const matchesSearch =
-        j.title.toLowerCase().includes(search.toLowerCase()) ||
-        j.company.toLowerCase().includes(search.toLowerCase());
-      const matchesType = typeFilter === "all" || j.type === typeFilter;
-      const matchesCountry = countryFilter === "all" || j.country === countryFilter;
-      return matchesSearch && matchesType && matchesCountry;
-    });
-  }, [jobs, search, typeFilter, countryFilter]);
-
-  const ranked = useMemo(() => {
-    if (showMatches && user) return rankJobs(user, filtered);
-    return filtered.map((job) => ({ job, score: 0 }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered, showMatches, user, cvKey]);
-
-  const hasCvData = !!(user?.cvText || user?.experience || user?.education);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <ScrollReveal>
         <h1 className="text-3xl font-bold">Find Your Next Role</h1>
-        <p className="mt-1 text-muted-foreground">Browse and filter job opportunities.</p>
+        <p className="mt-1 text-muted-foreground">
+          Browse and filter job opportunities.
+          {totalJobs > 0 && <span className="ml-2 text-sm">({totalJobs} jobs found)</span>}
+        </p>
       </ScrollReveal>
 
       <ScrollReveal delay={80}>
         <div className="mt-6 flex flex-wrap gap-3">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search jobs or companies…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input
+              placeholder="Search jobs or companies…"
+              className="pl-9"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            />
           </div>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[140px]"><SelectValue placeholder="Job type" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All types</SelectItem>
-              <SelectItem value="Full-time">Full-time</SelectItem>
-              <SelectItem value="Part-time">Part-time</SelectItem>
-              <SelectItem value="Contract">Contract</SelectItem>
-              <SelectItem value="Remote">Remote</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={countryFilter} onValueChange={setCountryFilter}>
+          <Select value={countryFilter} onValueChange={(v) => { setCountryFilter(v); setPage(1); }}>
             <SelectTrigger className="w-[140px]"><SelectValue placeholder="Country" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All countries</SelectItem>
@@ -105,87 +73,108 @@ export default function Jobs() {
               <SelectItem value="Germany">Germany</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setPage(1); }}>
+            <SelectTrigger className="w-[140px]"><SelectValue placeholder="Category" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              <SelectItem value="Engineering">Engineering</SelectItem>
+              <SelectItem value="Design">Design</SelectItem>
+              <SelectItem value="Marketing">Marketing</SelectItem>
+              <SelectItem value="Sales">Sales</SelectItem>
+              <SelectItem value="Other">Other</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </ScrollReveal>
 
-      {/* Matchmaking controls */}
-      <ScrollReveal delay={100}>
-        <Card className="glass mt-4">
-          <CardContent className="flex flex-wrap items-center gap-3 p-4">
-            <Sparkles className="h-5 w-5 text-accent" />
-            <span className="text-sm font-medium">AI Job Matching</span>
-            <span className="text-xs text-muted-foreground">Upload your CV or fill your profile to see match scores</span>
-            <div className="ml-auto flex items-center gap-2">
-              <label className="cursor-pointer">
-                <input type="file" accept=".pdf,.txt,.doc,.docx" className="hidden" onChange={handleCvUpload} />
-                <Button variant="outline" size="sm" className="gap-1.5 pointer-events-none" asChild>
-                  <span><Upload className="h-3.5 w-3.5" /> Upload CV</span>
-                </Button>
-              </label>
-              {hasCvData && (
-                <Button
-                  size="sm"
-                  variant={showMatches ? "default" : "outline"}
-                  onClick={() => setShowMatches(!showMatches)}
-                  className={showMatches ? "bg-accent text-accent-foreground hover:bg-accent/90 gap-1.5" : "gap-1.5"}
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  {showMatches ? "Matching ON" : "Show Matches"}
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </ScrollReveal>
-
-      <div className="mt-6 space-y-3">
-        {ranked.map(({ job, score }, i) => (
-          <ScrollReveal key={job.id} delay={i * 60}>
-            <Card className="glass transition-shadow hover:shadow-md">
-              <CardContent className="flex items-center gap-4 p-5">
-                {job.logo ? (
-                  <img src={job.logo} alt={job.company} className="h-12 w-12 shrink-0 rounded-lg object-cover" />
-                ) : (
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-                    {job.company.slice(0, 2).toUpperCase()}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+      {loading ? (
+        <div className="py-16 text-center text-muted-foreground">Loading jobs…</div>
+      ) : (
+        <div className="mt-6 space-y-3">
+          {jobs.map((job, i) => (
+            <ScrollReveal key={job.id} delay={i * 60}>
+              <Card className="glass transition-shadow hover:shadow-md">
+                <CardContent className="flex items-center gap-4 p-5">
+                  {job.company?.logoUrl ? (
+                    <img src={job.company.logoUrl} alt={job.company.companyName} className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+                  ) : (
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                      {(job.company?.companyName || "??").slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
                     <h3 className="font-semibold truncate">{job.title}</h3>
-                    {showMatches && score > 0 && (
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
-                        score >= 70 ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                        : score >= 40 ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-                        : "bg-muted text-muted-foreground"
-                      }`}>
-                        {score}% match
-                      </span>
+                    <p className="text-sm text-muted-foreground">{job.company?.companyName}</p>
+                    <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                      {(job.city || job.country) && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {[job.city, job.country].filter(Boolean).join(", ")}
+                        </span>
+                      )}
+                      {job.category && (
+                        <span className="flex items-center gap-1">
+                          <Briefcase className="h-3 w-3" />{job.category}
+                        </span>
+                      )}
+                      {job.status && (
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          job.status === "ACTIVE" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"
+                        }`}>
+                          {job.status}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {user?.role === "JOB_SEEKER" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={isJobSaved(job.id) ? "text-accent" : "text-muted-foreground hover:text-accent"}
+                        onClick={(e) => { e.preventDefault(); handleSave(job.id); }}
+                      >
+                        <Bookmark className={`h-4 w-4 ${isJobSaved(job.id) ? "fill-current" : ""}`} />
+                      </Button>
                     )}
+                    <Link to={`/jobs/${job.id}`}>
+                      <Button variant="ghost" size="icon"><ChevronRight className="h-4 w-4" /></Button>
+                    </Link>
                   </div>
-                  <p className="text-sm text-muted-foreground">{job.company}</p>
-                  <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.location}</span>
-                    <span className="flex items-center gap-1"><Briefcase className="h-3 w-3" />{job.type}</span>
-                    <span className="flex items-center gap-1"><GraduationCap className="h-3 w-3" />{job.education}</span>
-                    <span>€{Number(job.salaryMin).toLocaleString()}–€{Number(job.salaryMax).toLocaleString()}</span>
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="hidden text-xs text-muted-foreground sm:block">{job.posted}</span>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-accent"><Bookmark className="h-4 w-4" /></Button>
-                  <Link to={`/jobs/${job.id}`}>
-                    <Button variant="ghost" size="icon"><ChevronRight className="h-4 w-4" /></Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          </ScrollReveal>
-        ))}
-        {ranked.length === 0 && (
-          <div className="py-16 text-center text-muted-foreground">No jobs match your search. Try different keywords.</div>
-        )}
-      </div>
+                </CardContent>
+              </Card>
+            </ScrollReveal>
+          ))}
+          {jobs.length === 0 && (
+            <div className="py-16 text-center text-muted-foreground">No jobs match your search. Try different keywords.</div>
+          )}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-8 flex items-center justify-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,74 +1,70 @@
 import { useState } from "react";
-import { Camera, Briefcase, GraduationCap, Globe, FileText, Linkedin, Github } from "lucide-react";
-import { db } from "@/lib/api";
+import { Camera, Briefcase, GraduationCap, Globe } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 export default function Profile() {
   const { user, updateProfile } = useAuth();
+  const isRecruiter = user?.role === "COMPANY_RECRUITER";
 
+  // Job seeker fields
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
-  const [phone, setPhone] = useState(user?.phone || "");
+  const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || "");
   const [country, setCountry] = useState(user?.country || "");
   const [city, setCity] = useState(user?.city || "");
-  const [status, setStatus] = useState(user?.status || "looking");
-  const [experience, setExperience] = useState(user?.experience || "");
-  const [education, setEducation] = useState(user?.education || "");
-  const [portfolioUrl, setPortfolioUrl] = useState(user?.portfolioUrl || "");
-  const [linkedinUrl, setLinkedinUrl] = useState(user?.linkedinUrl || "");
-  const [githubUrl, setGithubUrl] = useState(user?.githubUrl || "");
+  const [bio, setBio] = useState(user?.bio || "");
+  const [portfolioLink, setPortfolioLink] = useState(user?.portfolioLink || "");
+  const [skills, setSkills] = useState(user?.skills?.join(", ") || "");
+  const [languages, setLanguages] = useState(user?.languages?.join(", ") || "");
+  const [personalStatement, setPersonalStatement] = useState(user?.personalStatement || "");
 
-  const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
+  // Company recruiter fields
+  const [companyName, setCompanyName] = useState(user?.companyName || "");
+  const [description, setDescription] = useState(user?.description || "");
+  const [industry, setIndustry] = useState(user?.industry || "");
+  const [logoUrl, setLogoUrl] = useState(user?.logoUrl || "");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [saving, setSaving] = useState(false);
+
+  const initials = isRecruiter
+    ? (companyName?.slice(0, 2) || "CO").toUpperCase()
+    : `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
     try {
-      updateProfile({
-        firstName, lastName, phone, country, city, status,
-        experience, education, portfolioUrl, linkedinUrl, githubUrl,
-      });
+      if (isRecruiter) {
+        await updateProfile({
+          companyName, description, phoneNumber, city, country, industry, logoUrl,
+        });
+      } else {
+        await updateProfile({
+          firstName, lastName, phoneNumber, country, city, bio, portfolioLink, personalStatement,
+          skills: skills.split(",").map((s) => s.trim()).filter(Boolean),
+          languages: languages.split(",").map((l) => l.trim()).filter(Boolean),
+        });
+      }
       toast.success("Profile updated!");
     } catch (err: any) {
       toast.error(err.message || "Failed to save");
+    } finally {
+      setSaving(false);
     }
-  };
-
-  const fileToBase64 = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
-  const handleCvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    const base64 = await fileToBase64(file);
-    const text = await file.text();
-
-    // Send base64 file to backend
-    db.uploadCv(user.id, base64, file.name);
-
-    // Update local profile for matching
-    updateProfile({ cvText: text });
-    toast.success("CV uploaded and parsed for job matching!");
   };
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <ScrollReveal>
         <h1 className="text-3xl font-bold">Profile</h1>
-        <p className="mt-1 text-muted-foreground">Manage your personal information and resume.</p>
+        <p className="mt-1 text-muted-foreground">Manage your personal information.</p>
       </ScrollReveal>
 
       <ScrollReveal delay={80}>
@@ -76,18 +72,24 @@ export default function Profile() {
           <CardContent className="pt-6">
             <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
               <div className="relative">
-                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10 text-3xl font-bold text-primary">
-                  {initials}
-                </div>
+                {user?.profilePicture || user?.logoUrl ? (
+                  <img src={user.profilePicture || user.logoUrl} alt="Avatar" className="h-24 w-24 rounded-full object-cover" />
+                ) : (
+                  <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10 text-3xl font-bold text-primary">
+                    {initials}
+                  </div>
+                )}
                 <button className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md hover:bg-accent/90 active:scale-95 transition-transform">
                   <Camera className="h-4 w-4" />
                 </button>
               </div>
               <div className="text-center sm:text-left">
-                <h2 className="text-xl font-semibold">{firstName} {lastName}</h2>
+                <h2 className="text-xl font-semibold">
+                  {isRecruiter ? companyName : `${firstName} ${lastName}`}
+                </h2>
                 <p className="text-sm text-muted-foreground">{user?.email}</p>
                 <span className="mt-2 inline-block rounded-full bg-accent/15 px-3 py-0.5 text-xs font-medium text-accent">
-                  {status === "looking" ? "Looking for work" : status === "working" ? "Currently employed" : "Open to offers"}
+                  {isRecruiter ? "Company Recruiter" : "Job Seeker"}
                 </span>
               </div>
             </div>
@@ -96,71 +98,72 @@ export default function Profile() {
       </ScrollReveal>
 
       <form className="mt-6 space-y-6" onSubmit={handleSubmit}>
-        <ScrollReveal delay={120}>
-          <Card className="glass">
-            <CardHeader><CardTitle className="flex items-center gap-2"><Briefcase className="h-4 w-4" /> Personal Info</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2"><Label>First name</Label><Input value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div>
-                <div className="space-y-2"><Label>Last name</Label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>
-              </div>
-              <div className="space-y-2"><Label>Phone</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2"><Label>Country</Label><Input value={country} onChange={(e) => setCountry(e.target.value)} /></div>
-                <div className="space-y-2"><Label>City</Label><Input value={city} onChange={(e) => setCity(e.target.value)} /></div>
-              </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="looking">Looking for work</SelectItem>
-                    <SelectItem value="working">Currently employed</SelectItem>
-                    <SelectItem value="open">Open to offers</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-        </ScrollReveal>
+        {isRecruiter ? (
+          <>
+            <ScrollReveal delay={120}>
+              <Card className="glass">
+                <CardHeader><CardTitle className="flex items-center gap-2"><Briefcase className="h-4 w-4" /> Company Info</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2"><Label>Company Name</Label><Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} /></div>
+                  <div className="space-y-2"><Label>Description</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} /></div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2"><Label>Phone</Label><Input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} /></div>
+                    <div className="space-y-2"><Label>Industry</Label><Input value={industry} onChange={(e) => setIndustry(e.target.value)} /></div>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2"><Label>Country</Label><Input value={country} onChange={(e) => setCountry(e.target.value)} /></div>
+                    <div className="space-y-2"><Label>City</Label><Input value={city} onChange={(e) => setCity(e.target.value)} /></div>
+                  </div>
+                  <div className="space-y-2"><Label>Logo URL</Label><Input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} /></div>
+                </CardContent>
+              </Card>
+            </ScrollReveal>
+          </>
+        ) : (
+          <>
+            <ScrollReveal delay={120}>
+              <Card className="glass">
+                <CardHeader><CardTitle className="flex items-center gap-2"><Briefcase className="h-4 w-4" /> Personal Info</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2"><Label>First name</Label><Input value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div>
+                    <div className="space-y-2"><Label>Last name</Label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>
+                  </div>
+                  <div className="space-y-2"><Label>Phone</Label><Input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} /></div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2"><Label>Country</Label><Input value={country} onChange={(e) => setCountry(e.target.value)} /></div>
+                    <div className="space-y-2"><Label>City</Label><Input value={city} onChange={(e) => setCity(e.target.value)} /></div>
+                  </div>
+                  <div className="space-y-2"><Label>Bio</Label><Textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} /></div>
+                </CardContent>
+              </Card>
+            </ScrollReveal>
 
-        <ScrollReveal delay={160}>
-          <Card className="glass">
-            <CardHeader><CardTitle className="flex items-center gap-2"><GraduationCap className="h-4 w-4" /> Experience & Education</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2"><Label>Work Experience</Label><Textarea placeholder="Describe your past roles, skills, technologies…" rows={4} value={experience} onChange={(e) => setExperience(e.target.value)} /></div>
-              <div className="space-y-2"><Label>Education / Degree</Label><Input placeholder="e.g., BSc Computer Science, KTH" value={education} onChange={(e) => setEducation(e.target.value)} /></div>
-            </CardContent>
-          </Card>
-        </ScrollReveal>
+            <ScrollReveal delay={160}>
+              <Card className="glass">
+                <CardHeader><CardTitle className="flex items-center gap-2"><GraduationCap className="h-4 w-4" /> Skills & Languages</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2"><Label>Skills (comma-separated)</Label><Input value={skills} onChange={(e) => setSkills(e.target.value)} placeholder="React, TypeScript, Node.js" /></div>
+                  <div className="space-y-2"><Label>Languages (comma-separated)</Label><Input value={languages} onChange={(e) => setLanguages(e.target.value)} placeholder="English, Swedish" /></div>
+                  <div className="space-y-2"><Label>Personal Statement</Label><Textarea value={personalStatement} onChange={(e) => setPersonalStatement(e.target.value)} rows={3} /></div>
+                </CardContent>
+              </Card>
+            </ScrollReveal>
 
-        <ScrollReveal delay={200}>
-          <Card className="glass">
-            <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4" /> Resume & Portfolio</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Upload CV (PDF/TXT)</Label>
-                <Input type="file" accept=".pdf,.txt,.doc,.docx" onChange={handleCvUpload} />
-                <p className="text-xs text-muted-foreground">Your CV text will be used for AI job matching on the Jobs page.</p>
-              </div>
-              <div className="space-y-2"><Label>Portfolio URL</Label><Input placeholder="https://myportfolio.com" value={portfolioUrl} onChange={(e) => setPortfolioUrl(e.target.value)} /></div>
-            </CardContent>
-          </Card>
-        </ScrollReveal>
+            <ScrollReveal delay={200}>
+              <Card className="glass">
+                <CardHeader><CardTitle className="flex items-center gap-2"><Globe className="h-4 w-4" /> Links</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2"><Label>Portfolio URL</Label><Input type="url" value={portfolioLink} onChange={(e) => setPortfolioLink(e.target.value)} placeholder="https://myportfolio.com" /></div>
+                </CardContent>
+              </Card>
+            </ScrollReveal>
+          </>
+        )}
 
         <ScrollReveal delay={240}>
-          <Card className="glass">
-            <CardHeader><CardTitle className="flex items-center gap-2"><Globe className="h-4 w-4" /> Social Links</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2 flex items-center gap-2"><Linkedin className="h-4 w-4 text-muted-foreground shrink-0" /><Input placeholder="LinkedIn profile URL" value={linkedinUrl} onChange={(e) => setLinkedinUrl(e.target.value)} /></div>
-              <div className="space-y-2 flex items-center gap-2"><Github className="h-4 w-4 text-muted-foreground shrink-0" /><Input placeholder="GitHub profile URL" value={githubUrl} onChange={(e) => setGithubUrl(e.target.value)} /></div>
-            </CardContent>
-          </Card>
-        </ScrollReveal>
-
-        <ScrollReveal delay={280}>
-          <Button type="submit" size="lg" className="w-full bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.97] transition-transform">
-            Save Changes
+          <Button type="submit" disabled={saving} size="lg" className="w-full bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.97] transition-transform">
+            {saving ? "Saving…" : "Save Changes"}
           </Button>
         </ScrollReveal>
       </form>

@@ -1,62 +1,102 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
-import { db, type Job } from "@/lib/api";
+import { api, type Job } from "@/lib/api";
 
 export type { Job };
 
 interface JobContextType {
   jobs: Job[];
-  getJob: (id: string) => Job | undefined;
-  getEmployerJobs: (employerId: string) => Job[];
-  createJob: (job: Omit<Job, "id" | "posted">) => Job;
-  updateJob: (id: string, data: Partial<Job>) => void;
-  deleteJob: (id: string) => void;
+  totalJobs: number;
+  currentPage: number;
+  totalPages: number;
+  loading: boolean;
+  fetchJobs: (params?: {
+    search?: string;
+    status?: string;
+    companyId?: number;
+    city?: string;
+    country?: string;
+    category?: string;
+    page?: number;
+    limit?: number;
+  }) => Promise<void>;
+  getJob: (id: number) => Promise<Job>;
+  createJob: (data: {
+    title: string;
+    description: string;
+    expiresAt: string;
+    webpage_url?: string;
+    city?: string;
+    country?: string;
+    category?: string;
+  }) => Promise<Job>;
+  updateJob: (id: number, data: Record<string, unknown>) => Promise<void>;
+  deleteJob: (id: number) => Promise<void>;
+  updateJobStatus: (id: number, status: "ACTIVE" | "ARCHIVED") => Promise<void>;
 }
 
 const JobContext = createContext<JobContextType>({
   jobs: [],
-  getJob: () => undefined,
-  getEmployerJobs: () => [],
-  createJob: () => ({} as Job),
-  updateJob: () => {},
-  deleteJob: () => {},
+  totalJobs: 0,
+  currentPage: 1,
+  totalPages: 1,
+  loading: false,
+  fetchJobs: async () => {},
+  getJob: async () => ({} as Job),
+  createJob: async () => ({} as Job),
+  updateJob: async () => {},
+  deleteJob: async () => {},
+  updateJobStatus: async () => {},
 });
 
 export function JobProvider({ children }: { children: ReactNode }) {
-  const [jobs, setJobs] = useState<Job[]>(() => db.loadJobs());
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [totalJobs, setTotalJobs] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
 
-  const save = (updated: Job[]) => {
-    setJobs(updated);
-    db.saveJobs(updated);
-  };
+  const fetchJobs = useCallback(async (params?: Parameters<typeof api.getJobs>[0]) => {
+    setLoading(true);
+    try {
+      const res = await api.getJobs(params);
+      setJobs(res.jobs);
+      setTotalJobs(res.meta.totalJobs);
+      setCurrentPage(res.meta.currentPage);
+      setTotalPages(res.meta.totalPages);
+    } catch (err) {
+      console.error("Failed to fetch jobs:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const getJob = useCallback((id: string) => jobs.find((j) => j.id === id), [jobs]);
-  const getEmployerJobs = useCallback((eid: string) => jobs.filter((j) => j.employerId === eid), [jobs]);
+  const getJob = useCallback(async (id: number) => {
+    return api.getJob(id);
+  }, []);
 
-  const createJob = useCallback(
-    (data: Omit<Job, "id" | "posted">) => {
-      const newJob: Job = { ...data, id: crypto.randomUUID(), posted: "Just now" };
-      save([newJob, ...jobs]);
-      return newJob;
-    },
-    [jobs],
-  );
+  const createJob = useCallback(async (data: Parameters<typeof api.createJob>[0]) => {
+    const newJob = await api.createJob(data);
+    setJobs((prev) => [newJob, ...prev]);
+    return newJob;
+  }, []);
 
-  const updateJob = useCallback(
-    (id: string, data: Partial<Job>) => {
-      save(jobs.map((j) => (j.id === id ? { ...j, ...data } : j)));
-    },
-    [jobs],
-  );
+  const updateJob = useCallback(async (id: number, data: Record<string, unknown>) => {
+    const updated = await api.updateJob(id, data);
+    setJobs((prev) => prev.map((j) => (j.id === id ? updated : j)));
+  }, []);
 
-  const deleteJob = useCallback(
-    (id: string) => {
-      save(jobs.filter((j) => j.id !== id));
-    },
-    [jobs],
-  );
+  const deleteJob = useCallback(async (id: number) => {
+    await api.deleteJob(id);
+    setJobs((prev) => prev.filter((j) => j.id !== id));
+  }, []);
+
+  const updateJobStatus = useCallback(async (id: number, status: "ACTIVE" | "ARCHIVED") => {
+    const updated = await api.updateJobStatus(id, status);
+    setJobs((prev) => prev.map((j) => (j.id === id ? updated : j)));
+  }, []);
 
   return (
-    <JobContext.Provider value={{ jobs, getJob, getEmployerJobs, createJob, updateJob, deleteJob }}>
+    <JobContext.Provider value={{ jobs, totalJobs, currentPage, totalPages, loading, fetchJobs, getJob, createJob, updateJob, deleteJob, updateJobStatus }}>
       {children}
     </JobContext.Provider>
   );

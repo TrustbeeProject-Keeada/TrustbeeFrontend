@@ -7,25 +7,43 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useJobs } from "@/contexts/JobContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { api, type Job } from "@/lib/api";
 
 export default function EditJob() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getJob, updateJob } = useJobs();
-  const job = getJob(id || "");
+  const { updateJob } = useJobs();
 
-  const [title, setTitle] = useState(job?.title || "");
-  const [company, setCompany] = useState(job?.company || "");
-  const [description, setDescription] = useState(job?.description || "");
-  const [requirements, setRequirements] = useState(job?.requirements || "");
-  const [type, setType] = useState(job?.type || "");
-  const [education, setEducation] = useState(job?.education || "");
-  const [country, setCountry] = useState(job?.country || "");
-  const [city, setCity] = useState(job?.city || "");
-  const [salaryMin, setSalaryMin] = useState(job?.salaryMin || "");
-  const [salaryMax, setSalaryMax] = useState(job?.salaryMax || "");
+  const [job, setJob] = useState<Job | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [webpageUrl, setWebpageUrl] = useState("");
+  const [country, setCountry] = useState("");
+  const [city, setCity] = useState("");
+  const [category, setCategory] = useState("");
+
+  useEffect(() => {
+    if (!id) return;
+    api.getJob(Number(id))
+      .then((j) => {
+        setJob(j);
+        setTitle(j.title || "");
+        setDescription(j.description || "");
+        setWebpageUrl(j.webpage_url || "");
+        setCountry(j.country || "");
+        setCity(j.city || "");
+        setCategory(j.category || "");
+      })
+      .catch(() => setJob(null))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) return <div className="mx-auto max-w-2xl px-4 py-20 text-center text-muted-foreground">Loading…</div>;
 
   if (!job) {
     return (
@@ -36,15 +54,24 @@ export default function EditJob() {
     );
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateJob(job.id, {
-      title, company, description, requirements, type, education,
-      country, city, salaryMin, salaryMax,
-      location: `${city}, ${country}`,
-    });
-    toast.success("Job updated successfully");
-    navigate("/manage-jobs");
+    setSaving(true);
+    try {
+      await updateJob(job.id, {
+        title, description,
+        webpage_url: webpageUrl || undefined,
+        country: country || undefined,
+        city: city || undefined,
+        category: category || undefined,
+      });
+      toast.success("Job updated successfully");
+      navigate("/manage-jobs");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update job");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -59,24 +86,30 @@ export default function EditJob() {
           <CardContent>
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-2"><Label>Job Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
-              <div className="space-y-2"><Label>Company Name</Label><Input value={company} onChange={(e) => setCompany(e.target.value)} /></div>
               <div className="space-y-2"><Label>Description</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5} /></div>
-              <div className="space-y-2"><Label>Requirements</Label><Textarea value={requirements} onChange={(e) => setRequirements(e.target.value)} rows={4} /></div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2"><Label>Job Type</Label><Select value={type} onValueChange={setType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Full-time">Full-time</SelectItem><SelectItem value="Part-time">Part-time</SelectItem><SelectItem value="Contract">Contract</SelectItem><SelectItem value="Remote">Remote</SelectItem></SelectContent></Select></div>
-                <div className="space-y-2"><Label>Education Level</Label><Select value={education} onValueChange={setEducation}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Any">Any</SelectItem><SelectItem value="BSc">BSc</SelectItem><SelectItem value="MSc">MSc</SelectItem><SelectItem value="MBA">MBA</SelectItem></SelectContent></Select></div>
-              </div>
+              <div className="space-y-2"><Label>Webpage URL</Label><Input type="url" value={webpageUrl} onChange={(e) => setWebpageUrl(e.target.value)} /></div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2"><Label>Country</Label><Input value={country} onChange={(e) => setCountry(e.target.value)} /></div>
                 <div className="space-y-2"><Label>City</Label><Input value={city} onChange={(e) => setCity(e.target.value)} /></div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2"><Label>Salary Min</Label><Input type="number" value={salaryMin} onChange={(e) => setSalaryMin(e.target.value)} /></div>
-                <div className="space-y-2"><Label>Salary Max</Label><Input type="number" value={salaryMax} onChange={(e) => setSalaryMax(e.target.value)} /></div>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Engineering">Engineering</SelectItem>
+                    <SelectItem value="Design">Design</SelectItem>
+                    <SelectItem value="Marketing">Marketing</SelectItem>
+                    <SelectItem value="Sales">Sales</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex gap-3">
                 <Button type="button" variant="outline" className="flex-1" onClick={() => navigate("/manage-jobs")}>Cancel</Button>
-                <Button type="submit" className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.97] transition-transform">Save Changes</Button>
+                <Button type="submit" disabled={saving} className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.97] transition-transform">
+                  {saving ? "Saving…" : "Save Changes"}
+                </Button>
               </div>
             </form>
           </CardContent>

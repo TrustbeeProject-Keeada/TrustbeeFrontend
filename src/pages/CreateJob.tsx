@@ -7,60 +7,50 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollReveal } from "@/components/ScrollReveal";
-import { useAuth } from "@/contexts/AuthContext";
 import { useJobs } from "@/contexts/JobContext";
 import { toast } from "sonner";
-import { Upload, X } from "lucide-react";
 
 export default function CreateJob() {
-  const { user } = useAuth();
   const { createJob } = useJobs();
   const navigate = useNavigate();
 
   const [title, setTitle] = useState("");
-  const [company, setCompany] = useState("");
   const [description, setDescription] = useState("");
-  const [requirements, setRequirements] = useState("");
-  const [type, setType] = useState("");
-  const [education, setEducation] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
+  const [webpageUrl, setWebpageUrl] = useState("");
   const [country, setCountry] = useState("");
   const [city, setCity] = useState("");
-  const [salaryMin, setSalaryMin] = useState("");
-  const [salaryMax, setSalaryMax] = useState("");
-  const [logo, setLogo] = useState("");
+  const [category, setCategory] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Logo must be under 2MB");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setLogo(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !company || !description) {
-      toast.error("Please fill in title, company, and description");
+    if (!title || !description || !expiresAt) {
+      toast.error("Please fill in title, description, and expiry date");
       return;
     }
-    createJob({
-      title, company, description, requirements,
-      type: type || "Full-time",
-      education: education || "Any",
-      country, city,
-      location: `${city}, ${country}`,
-      salaryMin, salaryMax,
-      logo,
-      employerId: user?.id || "",
-    });
-    toast.success("Job published!");
-    navigate("/manage-jobs");
+    if (description.length < 10) {
+      toast.error("Description must be at least 10 characters");
+      return;
+    }
+    setLoading(true);
+    try {
+      await createJob({
+        title,
+        description,
+        expiresAt: new Date(expiresAt).toISOString(),
+        webpage_url: webpageUrl || undefined,
+        country: country || undefined,
+        city: city || undefined,
+        category: category || undefined,
+      });
+      toast.success("Job published!");
+      navigate("/manage-jobs");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create job");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -74,55 +64,47 @@ export default function CreateJob() {
           <CardHeader><CardTitle>Job Details</CardTitle></CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={handleSubmit}>
-              {/* Company Logo */}
               <div className="space-y-2">
-                <Label>Company Logo</Label>
-                <div className="flex items-center gap-4">
-                  {logo ? (
-                    <div className="relative">
-                      <img src={logo} alt="Logo preview" className="h-16 w-16 rounded-lg object-cover border border-border" />
-                      <button
-                        type="button"
-                        onClick={() => setLogo("")}
-                        className="absolute -top-2 -right-2 rounded-full bg-destructive p-1 text-destructive-foreground"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-accent transition-colors">
-                      <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
-                      <Upload className="h-5 w-5 text-muted-foreground" />
-                    </label>
-                  )}
-                  <span className="text-xs text-muted-foreground">PNG, JPG up to 2MB</span>
-                </div>
+                <Label>Job Title *</Label>
+                <Input placeholder="e.g., Senior Frontend Developer" value={title} onChange={(e) => setTitle(e.target.value)} />
               </div>
-
-              <div className="space-y-2"><Label>Job Title</Label><Input placeholder="e.g., Senior Frontend Developer" value={title} onChange={(e) => setTitle(e.target.value)} /></div>
-              <div className="space-y-2"><Label>Company Name</Label><Input placeholder="Your company" value={company} onChange={(e) => setCompany(e.target.value)} /></div>
-              <div className="space-y-2"><Label>Description</Label><Textarea placeholder="Describe the role, responsibilities, and team…" rows={5} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
-              <div className="space-y-2"><Label>Requirements</Label><Textarea placeholder="List key requirements, one per line" rows={4} value={requirements} onChange={(e) => setRequirements(e.target.value)} /></div>
+              <div className="space-y-2">
+                <Label>Description * (min 10 chars)</Label>
+                <Textarea placeholder="Describe the role, responsibilities, and team…" rows={5} value={description} onChange={(e) => setDescription(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Expiry Date *</Label>
+                <Input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Webpage URL</Label>
+                <Input type="url" placeholder="https://company.com/careers/role" value={webpageUrl} onChange={(e) => setWebpageUrl(e.target.value)} />
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Job Type</Label>
-                  <Select value={type} onValueChange={setType}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent><SelectItem value="Full-time">Full-time</SelectItem><SelectItem value="Part-time">Part-time</SelectItem><SelectItem value="Contract">Contract</SelectItem><SelectItem value="Remote">Remote</SelectItem></SelectContent></Select>
+                  <Label>Country</Label>
+                  <Input placeholder="Sweden" value={country} onChange={(e) => setCountry(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Education Level</Label>
-                  <Select value={education} onValueChange={setEducation}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent><SelectItem value="Any">Any</SelectItem><SelectItem value="BSc">BSc</SelectItem><SelectItem value="MSc">MSc</SelectItem><SelectItem value="MBA">MBA</SelectItem></SelectContent></Select>
+                  <Label>City</Label>
+                  <Input placeholder="Stockholm" value={city} onChange={(e) => setCity(e.target.value)} />
                 </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2"><Label>Country</Label><Input placeholder="Sweden" value={country} onChange={(e) => setCountry(e.target.value)} /></div>
-                <div className="space-y-2"><Label>City</Label><Input placeholder="Stockholm" value={city} onChange={(e) => setCity(e.target.value)} /></div>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Engineering">Engineering</SelectItem>
+                    <SelectItem value="Design">Design</SelectItem>
+                    <SelectItem value="Marketing">Marketing</SelectItem>
+                    <SelectItem value="Sales">Sales</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2"><Label>Salary Min</Label><Input type="number" placeholder="50000" value={salaryMin} onChange={(e) => setSalaryMin(e.target.value)} /></div>
-                <div className="space-y-2"><Label>Salary Max</Label><Input type="number" placeholder="80000" value={salaryMax} onChange={(e) => setSalaryMax(e.target.value)} /></div>
-              </div>
-              <Button type="submit" size="lg" className="w-full bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.97] transition-transform">
-                Publish Job
+              <Button type="submit" disabled={loading} size="lg" className="w-full bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.97] transition-transform">
+                {loading ? "Publishing…" : "Publish Job"}
               </Button>
             </form>
           </CardContent>

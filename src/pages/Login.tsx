@@ -3,8 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useAuth } from "@/contexts/AuthContext";
+import { UserRole } from "@/lib/api";
 import { toast } from "sonner";
 import logo from "@/assets/trustbee-logo.png";
 
@@ -13,6 +15,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState<UserRole>("JOB_SEEKER");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -23,7 +26,7 @@ export default function Login() {
     }
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, role);
       toast.success("Welcome back!");
       navigate("/dashboard");
     } catch (err: any) {
@@ -43,6 +46,16 @@ export default function Login() {
             <p className="mt-1 text-sm text-muted-foreground">Sign in to your TrustBee account</p>
           </div>
           <form className="space-y-4" onSubmit={handleSubmit}>
+            <div className="space-y-2">
+              <Label>I am a</Label>
+              <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="JOB_SEEKER">Job Seeker</SelectItem>
+                  <SelectItem value="COMPANY_RECRUITER">Company / Recruiter</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />

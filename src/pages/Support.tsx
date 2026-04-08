@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollReveal } from "@/components/ScrollReveal";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 const faqs = [
   { q: "How do I create an account?", a: "Click 'Sign up' in the top navigation, fill in your details, and verify your email to get started." },
@@ -17,6 +19,32 @@ const faqs = [
 
 export default function Support() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [firstname, setFirstname] = useState("");
+  const [lastname, setLastname] = useState("");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!firstname || !lastname || !email || !message) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    setSending(true);
+    try {
+      await api.submitSupport({ firstname, lastname, email, message });
+      toast.success("Support ticket submitted! We'll get back to you soon.");
+      setFirstname("");
+      setLastname("");
+      setEmail("");
+      setMessage("");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to submit");
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -25,29 +53,39 @@ export default function Support() {
         <p className="mt-1 text-muted-foreground">Get in touch or find answers to common questions.</p>
       </ScrollReveal>
 
-      {/* Contact form */}
       <ScrollReveal delay={80}>
         <Card className="glass mt-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Mail className="h-4 w-4" /> Contact Us</CardTitle>
           </CardHeader>
           <CardContent>
-            <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+            <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2"><Label>Name</Label><Input placeholder="Your name" /></div>
-                <div className="space-y-2"><Label>Email</Label><Input type="email" placeholder="you@example.com" /></div>
+                <div className="space-y-2">
+                  <Label>First name *</Label>
+                  <Input placeholder="Jane" value={firstname} onChange={(e) => setFirstname(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Last name *</Label>
+                  <Input placeholder="Doe" value={lastname} onChange={(e) => setLastname(e.target.value)} />
+                </div>
               </div>
-              <div className="space-y-2"><Label>Subject</Label><Input placeholder="How can we help?" /></div>
-              <div className="space-y-2"><Label>Message</Label><Textarea placeholder="Describe your issue or question…" rows={4} /></div>
-              <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.97] transition-transform gap-2">
-                <MessageCircle className="h-4 w-4" /> Send Message
+              <div className="space-y-2">
+                <Label>Email *</Label>
+                <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Message *</Label>
+                <Textarea placeholder="Describe your issue or question…" rows={4} value={message} onChange={(e) => setMessage(e.target.value)} />
+              </div>
+              <Button type="submit" disabled={sending} className="bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.97] transition-transform gap-2">
+                <MessageCircle className="h-4 w-4" /> {sending ? "Sending…" : "Send Message"}
               </Button>
             </form>
           </CardContent>
         </Card>
       </ScrollReveal>
 
-      {/* FAQ */}
       <ScrollReveal delay={140}>
         <div className="mt-10">
           <h2 className="text-xl font-bold mb-4">Frequently Asked Questions</h2>

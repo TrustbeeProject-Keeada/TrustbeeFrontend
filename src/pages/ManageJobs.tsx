@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Pencil, Trash2, Eye } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, Archive, RotateCcw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollReveal } from "@/components/ScrollReveal";
@@ -13,12 +14,31 @@ import { toast } from "sonner";
 
 export default function ManageJobs() {
   const { user } = useAuth();
-  const { getEmployerJobs, deleteJob } = useJobs();
-  const myJobs = user ? getEmployerJobs(user.id) : [];
+  const { jobs, loading, fetchJobs, deleteJob, updateJobStatus } = useJobs();
 
-  const handleDelete = (id: string) => {
-    deleteJob(id);
-    toast.success("Job deleted");
+  useEffect(() => {
+    if (user) {
+      fetchJobs({ companyId: user.id });
+    }
+  }, [user, fetchJobs]);
+
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteJob(id);
+      toast.success("Job deleted");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete job");
+    }
+  };
+
+  const handleToggleStatus = async (id: number, currentStatus?: string) => {
+    const newStatus = currentStatus === "ARCHIVED" ? "ACTIVE" : "ARCHIVED";
+    try {
+      await updateJobStatus(id, newStatus);
+      toast.success(`Job ${newStatus === "ARCHIVED" ? "archived" : "reactivated"}`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update status");
+    }
   };
 
   if (!user) {
@@ -44,25 +64,47 @@ export default function ManageJobs() {
         </div>
       </ScrollReveal>
       <div className="mt-8 space-y-3">
-        {myJobs.length === 0 && (
+        {loading && <div className="py-16 text-center text-muted-foreground">Loading…</div>}
+        {!loading && jobs.length === 0 && (
           <div className="py-16 text-center text-muted-foreground">
             <p>You haven't posted any jobs yet.</p>
             <Link to="/create-job"><Button variant="outline" className="mt-4 gap-2"><Plus className="h-4 w-4" /> Post your first job</Button></Link>
           </div>
         )}
-        {myJobs.map((job, i) => (
+        {jobs.map((job, i) => (
           <ScrollReveal key={job.id} delay={i * 60}>
             <Card className="glass transition-shadow hover:shadow-md">
               <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">{job.company.slice(0, 2).toUpperCase()}</div>
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                  {(job.company?.companyName || "??").slice(0, 2).toUpperCase()}
+                </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold truncate">{job.title}</h3>
-                  <p className="text-sm text-muted-foreground">{job.company} · {job.location}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{job.type} · Posted {job.posted}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {job.company?.companyName} · {[job.city, job.country].filter(Boolean).join(", ")}
+                  </p>
+                  <div className="flex gap-2 mt-1">
+                    {job.status && (
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        job.status === "ACTIVE" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {job.status}
+                      </span>
+                    )}
+                    {job.category && <span className="text-xs text-muted-foreground">{job.category}</span>}
+                  </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <Link to={`/jobs/${job.id}`}><Button variant="ghost" size="icon" title="View"><Eye className="h-4 w-4" /></Button></Link>
                   <Link to={`/edit-job/${job.id}`}><Button variant="ghost" size="icon" title="Edit"><Pencil className="h-4 w-4" /></Button></Link>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title={job.status === "ARCHIVED" ? "Reactivate" : "Archive"}
+                    onClick={() => handleToggleStatus(job.id, job.status)}
+                  >
+                    {job.status === "ARCHIVED" ? <RotateCcw className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+                  </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="ghost" size="icon" title="Delete" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>

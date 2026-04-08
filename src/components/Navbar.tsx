@@ -30,6 +30,10 @@ export function Navbar() {
 
   const navLinks = isEmployer ? employerLinks : seekerLinks;
 
+  const displayName = user?.firstName
+    ? `${user.firstName} ${user.lastName || ""}`
+    : user?.companyName || "";
+
   const handleLogout = () => {
     logout();
     navigate("/");
@@ -63,7 +67,7 @@ export function Navbar() {
           {isAuthenticated ? (
             <>
               <span className="hidden text-sm text-muted-foreground md:block">
-                {user?.firstName} {user?.lastName}
+                {displayName}
               </span>
               <Button variant="outline" size="sm" onClick={handleLogout} className="hidden gap-1.5 md:flex">
                 <LogOut className="h-4 w-4" /> Log out

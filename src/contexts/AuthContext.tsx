@@ -1,51 +1,103 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
-import { db, type User, type UserRole, type RegisterRequest, type UpdateProfileRequest } from "@/lib/api";
+import { api, type User, type UserRole } from "@/lib/api";
 
-export type { User, UserRole, RegisterRequest };
-export type RegisterData = RegisterRequest;
+export type { User, UserRole };
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isEmployer: boolean;
-  login: (email: string, password: string) => void;
-  register: (data: RegisterData) => void;
+  login: (email: string, password: string, role: UserRole) => Promise<void>;
+  registerJobSeeker: (data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    cv?: string;
+    personalStatement?: string;
+  }) => Promise<void>;
+  registerCompanyRecruiter: (data: {
+    email: string;
+    password: string;
+    companyName: string;
+    organizationNumber: number;
+    phoneNumber: string;
+    description?: string;
+    logoUrl?: string;
+  }) => Promise<void>;
   logout: () => void;
-  updateProfile: (data: UpdateProfileRequest) => void;
+  updateProfile: (data: Record<string, unknown>) => Promise<void>;
+  setUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isAuthenticated: false,
   isEmployer: false,
-  login: () => {},
-  register: () => {},
+  login: async () => {},
+  registerJobSeeker: async () => {},
+  registerCompanyRecruiter: async () => {},
   logout: () => {},
-  updateProfile: () => {},
+  updateProfile: async () => {},
+  setUser: () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => db.getStoredUser());
+  const [user, setUser] = useState<User | null>(() => api.getStoredUser());
 
-  const login = useCallback((email: string, password: string) => {
-    const found = db.login(email, password);
-    setUser(found);
+  const login = useCallback(async (email: string, password: string, role: UserRole) => {
+    let loggedIn: User;
+    if (role === "COMPANY_RECRUITER") {
+      loggedIn = await api.loginCompanyRecruiter(email, password);
+    } else {
+      loggedIn = await api.loginJobSeeker(email, password);
+    }
+    setUser(loggedIn);
   }, []);
 
-  const register = useCallback((data: RegisterData) => {
-    const newUser = db.register(data);
-    setUser(newUser);
+  const registerJobSeeker = useCallback(async (data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    cv?: string;
+    personalStatement?: string;
+  }) => {
+    await api.registerJobSeeker(data);
+    // Auto-login after register
+    const loggedIn = await api.loginJobSeeker(data.email, data.password);
+    setUser(loggedIn);
+  }, []);
+
+  const registerCompanyRecruiter = useCallback(async (data: {
+    email: string;
+    password: string;
+    companyName: string;
+    organizationNumber: number;
+    phoneNumber: string;
+    description?: string;
+    logoUrl?: string;
+  }) => {
+    await api.registerCompanyRecruiter(data);
+    // Auto-login after register
+    const loggedIn = await api.loginCompanyRecruiter(data.email, data.password);
+    setUser(loggedIn);
   }, []);
 
   const logout = useCallback(() => {
-    db.logout();
+    api.logout();
     setUser(null);
   }, []);
 
-  const updateProfile = useCallback((data: UpdateProfileRequest) => {
+  const updateProfile = useCallback(async (data: Record<string, unknown>) => {
     if (!user) throw new Error("Not authenticated");
-    const updated = db.updateProfile(user, data);
-    setUser(updated);
+    let updated: User;
+    if (user.role === "COMPANY_RECRUITER") {
+      updated = await api.updateCompanyRecruiter(user.id, data);
+    } else {
+      updated = await api.updateJobSeeker(user.id, data);
+    }
+    setUser((prev) => prev ? { ...prev, ...updated } : prev);
   }, [user]);
 
   return (
@@ -53,11 +105,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         isAuthenticated: !!user,
-        isEmployer: user?.role === "employer",
+        isEmployer: user?.role === "COMPANY_RECRUITER",
         login,
-        register,
+        registerJobSeeker,
+        registerCompanyRecruiter,
         logout,
         updateProfile,
+        setUser,
       }}
     >
       {children}

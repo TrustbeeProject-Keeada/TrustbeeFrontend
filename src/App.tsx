@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { JobProvider } from "@/contexts/JobContext";
+import { SavedProvider } from "@/contexts/SavedContext";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -37,6 +38,7 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <JobProvider>
+            <SavedProvider>
               <div className="flex min-h-screen flex-col">
                 <Navbar />
                 <main className="flex-1">
@@ -61,6 +63,7 @@ const App = () => (
                 </main>
                 <Footer />
               </div>
+            </SavedProvider>
             </JobProvider>
           </AuthProvider>
         </BrowserRouter>
