@@ -104,11 +104,16 @@ export function CvBuilder() {
     setLoading(true);
     try {
       const base64 = generateCvPdfBase64(form);
+      // Also trigger a download for the user
+      const link = document.createElement("a");
+      link.href = base64;
+      link.download = `${form.fullName.replace(/\s+/g, "_")}_CV.pdf`;
+      link.click();
       // Send CV to backend via jobseeker profile update
       if (user) {
         await api.updateJobSeeker(user.id, { cv: base64 });
       }
-      toast({ title: "CV Created!", description: "Your CV has been generated and sent to the server." });
+      toast({ title: "CV Created!", description: "Your CV has been generated and saved to your profile." });
       setOpen(false);
       setForm(initial);
     } catch {

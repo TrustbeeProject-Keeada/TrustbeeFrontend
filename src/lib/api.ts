@@ -483,10 +483,3 @@ export const api = {
   },
 };
 
-// ━━━ Backward compat — keep `db` export for CvBuilder ━━━
-export const db = {
-  uploadGeneratedCv(userId: number, base64Pdf: string, _fileName: string): void {
-    // For CV, we update the jobseeker's cv field
-    api.updateJobSeeker(userId, { cv: base64Pdf }).catch(() => {});
-  },
-};
