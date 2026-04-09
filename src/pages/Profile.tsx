@@ -1,12 +1,14 @@
-import { useState } from "react";
-import { Camera, Briefcase, GraduationCap, Globe } from "lucide-react";
+import { useState, useRef } from "react";
+import { Camera, Briefcase, GraduationCap, Globe, Upload, FileText, Download, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollReveal } from "@/components/ScrollReveal";
+import { CvBuilder } from "@/components/CvBuilder";
 import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function Profile() {
@@ -32,6 +34,39 @@ export default function Profile() {
   const [logoUrl, setLogoUrl] = useState(user?.logoUrl || "");
 
   const [saving, setSaving] = useState(false);
+  const [uploadingCv, setUploadingCv] = useState(false);
+  const cvInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (file.type !== "application/pdf") {
+      toast.error("Please upload a PDF file.");
+      return;
+    }
+    setUploadingCv(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        await api.updateJobSeeker(user.id, { cv: base64 });
+        toast.success("CV uploaded successfully!");
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      toast.error("Failed to upload CV.");
+    } finally {
+      setUploadingCv(false);
+    }
+  };
+
+  const handleDownloadCv = () => {
+    if (!user?.cv) return;
+    const link = document.createElement("a");
+    link.href = user.cv;
+    link.download = `${user.firstName || "my"}_cv.pdf`;
+    link.click();
+  };
 
   const initials = isRecruiter
     ? (companyName?.slice(0, 2) || "CO").toUpperCase()
@@ -155,6 +190,28 @@ export default function Profile() {
                 <CardHeader><CardTitle className="flex items-center gap-2"><Globe className="h-4 w-4" /> Links</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2"><Label>Portfolio URL</Label><Input type="url" value={portfolioLink} onChange={(e) => setPortfolioLink(e.target.value)} placeholder="https://myportfolio.com" /></div>
+                </CardContent>
+              </Card>
+            </ScrollReveal>
+
+            <ScrollReveal delay={240}>
+              <Card className="glass">
+                <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4" /> CV / Resume</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    <input ref={cvInputRef} type="file" accept=".pdf" className="hidden" onChange={handleCvUpload} />
+                    <Button type="button" variant="outline" size="sm" disabled={uploadingCv} onClick={() => cvInputRef.current?.click()}>
+                      {uploadingCv ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Upload className="mr-1.5 h-4 w-4" />}
+                      Upload PDF
+                    </Button>
+                    <CvBuilder />
+                    {user?.cv && (
+                      <Button type="button" variant="outline" size="sm" onClick={handleDownloadCv}>
+                        <Download className="mr-1.5 h-4 w-4" /> Download CV
+                      </Button>
+                    )}
+                  </div>
+                  {user?.cv && <p className="text-xs text-muted-foreground">✓ CV on file</p>}
                 </CardContent>
               </Card>
             </ScrollReveal>
