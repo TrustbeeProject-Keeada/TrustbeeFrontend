@@ -1,8 +1,21 @@
 import { useState, useEffect } from "react";
-import { Search, MapPin, Briefcase, Bookmark, ChevronRight, ChevronLeft } from "lucide-react";
+import {
+  Search,
+  MapPin,
+  Briefcase,
+  Bookmark,
+  ChevronRight,
+  ChevronLeft,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Link } from "react-router-dom";
@@ -12,7 +25,8 @@ import { useSaved } from "@/contexts/SavedContext";
 import { toast } from "sonner";
 
 export default function Jobs() {
-  const { jobs, totalJobs, currentPage, totalPages, loading, fetchJobs } = useJobs();
+  const { jobs, totalJobs, currentPage, totalPages, loading, fetchJobs } =
+    useJobs();
   const { user } = useAuth();
   const { isJobSaved, toggleSaveJob } = useSaved();
   const [search, setSearch] = useState("");
@@ -48,7 +62,9 @@ export default function Jobs() {
         <h1 className="text-3xl font-bold">Find Your Next Role</h1>
         <p className="mt-1 text-muted-foreground">
           Browse and filter job opportunities.
-          {totalJobs > 0 && <span className="ml-2 text-sm">({totalJobs} jobs found)</span>}
+          {totalJobs > 0 && (
+            <span className="ml-2 text-sm">({totalJobs} jobs found)</span>
+          )}
         </p>
       </ScrollReveal>
 
@@ -60,11 +76,22 @@ export default function Jobs() {
               placeholder="Search jobs or companies…"
               className="pl-9"
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
             />
           </div>
-          <Select value={countryFilter} onValueChange={(v) => { setCountryFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-[140px]"><SelectValue placeholder="Country" /></SelectTrigger>
+          <Select
+            value={countryFilter}
+            onValueChange={(v) => {
+              setCountryFilter(v);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Country" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All countries</SelectItem>
               <SelectItem value="Sweden">Sweden</SelectItem>
@@ -73,8 +100,16 @@ export default function Jobs() {
               <SelectItem value="Germany">Germany</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-[140px]"><SelectValue placeholder="Category" /></SelectTrigger>
+          <Select
+            value={categoryFilter}
+            onValueChange={(v) => {
+              setCategoryFilter(v);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All categories</SelectItem>
               <SelectItem value="Engineering">Engineering</SelectItem>
@@ -88,7 +123,9 @@ export default function Jobs() {
       </ScrollReveal>
 
       {loading ? (
-        <div className="py-16 text-center text-muted-foreground">Loading jobs…</div>
+        <div className="py-16 text-center text-muted-foreground">
+          Loading jobs…
+        </div>
       ) : (
         <div className="mt-6 space-y-3">
           {jobs.map((job, i) => (
@@ -96,15 +133,23 @@ export default function Jobs() {
               <Card className="glass transition-shadow hover:shadow-md">
                 <CardContent className="flex items-center gap-4 p-5">
                   {job.company?.logoUrl ? (
-                    <img src={job.company.logoUrl} alt={job.company.companyName} className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+                    <img
+                      src={job.company.logoUrl}
+                      alt={job.company.companyName}
+                      className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                    />
                   ) : (
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-                      {(job.company?.companyName || "??").slice(0, 2).toUpperCase()}
+                      {(job.company?.companyName || "??")
+                        .slice(0, 2)
+                        .toUpperCase()}
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold truncate">{job.title}</h3>
-                    <p className="text-sm text-muted-foreground">{job.company?.companyName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {job.company?.companyName}
+                    </p>
                     <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-muted-foreground">
                       {(job.city || job.country) && (
                         <span className="flex items-center gap-1">
@@ -114,13 +159,18 @@ export default function Jobs() {
                       )}
                       {job.category && (
                         <span className="flex items-center gap-1">
-                          <Briefcase className="h-3 w-3" />{job.category}
+                          <Briefcase className="h-3 w-3" />
+                          {job.category}
                         </span>
                       )}
                       {job.status && (
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                          job.status === "ACTIVE" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"
-                        }`}>
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            job.status === "ACTIVE"
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
                           {job.status}
                         </span>
                       )}
@@ -131,14 +181,27 @@ export default function Jobs() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className={isJobSaved(job.id) ? "text-accent" : "text-muted-foreground hover:text-accent"}
-                        onClick={(e) => { e.preventDefault(); handleSave(job.id); }}
+                        className={
+                          isJobSaved(job.id)
+                            ? "text-accent"
+                            : "text-muted-foreground hover:text-accent"
+                        }
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleSave(job.id);
+                        }}
                       >
-                        <Bookmark className={`h-4 w-4 ${isJobSaved(job.id) ? "fill-current" : ""}`} />
+                        <Bookmark
+                          className={`h-4 w-4 ${isJobSaved(job.id) ? "fill-current" : ""}`}
+                        />
                       </Button>
                     )}
-                    <Link to={`/jobs/${job.id}`}>
-                      <Button variant="ghost" size="icon"><ChevronRight className="h-4 w-4" /></Button>
+                    <Link
+                      to={`/jobs/${job.id}${job.source ? `?source=${job.source}` : ""}`}
+                    >
+                      <Button variant="ghost" size="icon">
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
                     </Link>
                   </div>
                 </CardContent>
@@ -146,7 +209,9 @@ export default function Jobs() {
             </ScrollReveal>
           ))}
           {jobs.length === 0 && (
-            <div className="py-16 text-center text-muted-foreground">No jobs match your search. Try different keywords.</div>
+            <div className="py-16 text-center text-muted-foreground">
+              No jobs match your search. Try different keywords.
+            </div>
           )}
         </div>
       )}

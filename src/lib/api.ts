@@ -5,7 +5,8 @@
  */
 
 // ━━━ API Base URL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
 
 // ━━━ Types ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export type UserRole = "JOB_SEEKER" | "COMPANY_RECRUITER" | "ADMIN";
@@ -46,9 +47,9 @@ export interface JobCompany {
 }
 
 export interface Job {
-  id: number;
+  id: number | string;
   title: string;
-  description: string;
+  description: string | { text?: string; text_formatted?: string };
   webpage_url?: string;
   country?: string;
   city?: string;
@@ -56,6 +57,9 @@ export interface Job {
   status?: string;
   expiresAt?: string;
   company: JobCompany;
+  employmentType?: string;
+  salaryType?: string;
+  source?: "trustbee" | "job_bank"; // Track which API the job came from
 }
 
 export interface JobsResponse {
@@ -172,7 +176,10 @@ export class ApiError extends Error {
   }
 }
 
-async function apiCall<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function apiCall<T = unknown>(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<T> {
   const token = localStorage.getItem(TOKEN_KEY);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -183,7 +190,7 @@ async function apiCall<T = unknown>(endpoint: string, options: RequestInit = {})
     ...options,
     headers: {
       ...headers,
-      ...(options.headers as Record<string, string> || {}),
+      ...((options.headers as Record<string, string>) || {}),
     },
   });
 
@@ -206,10 +213,13 @@ async function apiCall<T = unknown>(endpoint: string, options: RequestInit = {})
 export const api = {
   // ── Auth ──────────────────────────────────────
   async loginJobSeeker(email: string, password: string): Promise<User> {
-    const data = await apiCall<{ status: string; jobseeker: User }>("/auth/loginjobseeker", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
+    const data = await apiCall<{ status: string; jobseeker: User }>(
+      "/auth/loginjobseeker",
+      {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      },
+    );
     const user = data.jobseeker;
     localStorage.setItem(TOKEN_KEY, user.token);
     localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -217,10 +227,13 @@ export const api = {
   },
 
   async loginCompanyRecruiter(email: string, password: string): Promise<User> {
-    const data = await apiCall<{ status: string; companyRecruiter: User }>("/auth/logincompanyrecruiter", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
+    const data = await apiCall<{ status: string; companyRecruiter: User }>(
+      "/auth/logincompanyrecruiter",
+      {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      },
+    );
     const user = data.companyRecruiter;
     localStorage.setItem(TOKEN_KEY, user.token);
     localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -228,18 +241,24 @@ export const api = {
   },
 
   async registerJobSeeker(body: RegisterJobSeekerRequest): Promise<User> {
-    const data = await apiCall<{ status: string; jobseeker: User }>("/auth/registerjobseeker", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+    const data = await apiCall<{ status: string; jobseeker: User }>(
+      "/auth/registerjobseeker",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+    );
     return data.jobseeker;
   },
 
   async registerCompanyRecruiter(body: RegisterCompanyRequest): Promise<User> {
-    const data = await apiCall<{ status: string; companyRecruiter: User }>("/auth/registercompanyrecruiter", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+    const data = await apiCall<{ status: string; companyRecruiter: User }>(
+      "/auth/registercompanyrecruiter",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+    );
     return data.companyRecruiter;
   },
 
@@ -266,15 +285,23 @@ export const api = {
     return apiCall<User>(`/jobseekers/${id}`);
   },
 
-  async getJobSeekerDashboard(id: number): Promise<{ status: string; data: Record<string, unknown> }> {
+  async getJobSeekerDashboard(
+    id: number,
+  ): Promise<{ status: string; data: Record<string, unknown> }> {
     return apiCall(`/jobseekers/${id}/dashboard`);
   },
 
-  async updateJobSeeker(id: number, data: Record<string, unknown>): Promise<User> {
-    const res = await apiCall<{ status: string; jobseeker: User }>(`/jobseekers/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    });
+  async updateJobSeeker(
+    id: number,
+    data: Record<string, unknown>,
+  ): Promise<User> {
+    const res = await apiCall<{ status: string; jobseeker: User }>(
+      `/jobseekers/${id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      },
+    );
     const updated = res.jobseeker;
     // Update cached user
     const stored = this.getStoredUser();
@@ -290,15 +317,23 @@ export const api = {
   },
 
   // ── Company Recruiters ────────────────────────
-  async getCompanyRecruiter(id: number): Promise<{ status: string; data: User }> {
+  async getCompanyRecruiter(
+    id: number,
+  ): Promise<{ status: string; data: User }> {
     return apiCall(`/companyrecruiter/${id}`);
   },
 
-  async updateCompanyRecruiter(id: number, data: Record<string, unknown>): Promise<User> {
-    const res = await apiCall<{ status: string; data: User }>(`/companyrecruiter/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    });
+  async updateCompanyRecruiter(
+    id: number,
+    data: Record<string, unknown>,
+  ): Promise<User> {
+    const res = await apiCall<{ status: string; data: User }>(
+      `/companyrecruiter/${id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      },
+    );
     const updated = res.data;
     const stored = this.getStoredUser();
     if (stored && stored.id === id) {
@@ -330,11 +365,66 @@ export const api = {
       });
     }
     const qs = query.toString();
-    return apiCall<JobsResponse>(`/jobs${qs ? `?${qs}` : ""}`);
+
+    // Fetch from both TrustBee jobs and job bank
+    const [trustbeeRes, jobBankRes] = await Promise.all([
+      apiCall<JobsResponse>(`/jobs${qs ? `?${qs}` : ""}`),
+      apiCall<{
+        jobs: Job[];
+        meta: { totalJobs: number; currentPage: number; totalPages: number };
+      }>(`/jobs/job_bank${qs ? `?${qs}` : ""}`).catch(() => ({
+        jobs: [],
+        meta: { totalJobs: 0, currentPage: 1, totalPages: 1 },
+      })),
+    ]);
+
+    // Extract totalJobs value (handle both number and { value: number } formats)
+    const trustbeeTotalJobs =
+      typeof trustbeeRes.meta.totalJobs === "object"
+        ? (trustbeeRes.meta.totalJobs as Record<string, number>).value
+        : (trustbeeRes.meta.totalJobs as number);
+
+    // Tag jobs with their source
+    const trustbeeJobs = trustbeeRes.jobs.map((job) => ({
+      ...job,
+      source: "trustbee" as const,
+    }));
+    const bankJobs = jobBankRes.jobs.map((job) => ({
+      ...job,
+      source: "job_bank" as const,
+    }));
+
+    // Combine jobs from both sources
+    const allJobs = [...trustbeeJobs, ...bankJobs];
+
+    return {
+      jobs: allJobs,
+      meta: {
+        totalJobs: trustbeeTotalJobs + jobBankRes.meta.totalJobs,
+        currentPage: trustbeeRes.meta.currentPage,
+        totalPages: trustbeeRes.meta.totalPages,
+      },
+    };
   },
 
-  async getJob(id: number): Promise<Job> {
-    return apiCall<Job>(`/jobs/${id}`);
+  async getJob(
+    id: number | string,
+    source?: "trustbee" | "job_bank",
+  ): Promise<Job> {
+    // Use explicit source if provided, otherwise detect based on ID type
+    const endpoint =
+      source === "job_bank" || (typeof id === "string" && source !== "trustbee")
+        ? `/jobs/job_bank/${id}`
+        : `/jobs/${id}`;
+
+    const response = await apiCall<Job | { data: Job } | { job: Job }>(
+      endpoint,
+    );
+
+    // Handle different response formats
+    if ("data" in response) return (response as { data: Job }).data;
+    if ("job" in response) return (response as { job: Job }).job;
+    return response as Job;
   },
 
   async createJob(data: {
@@ -364,15 +454,25 @@ export const api = {
     await apiCall(`/jobs/${id}`, { method: "DELETE" });
   },
 
-  async updateJobStatus(id: number, status: "ACTIVE" | "ARCHIVED"): Promise<Job> {
-    const res = await apiCall<{ status: string; data: Job }>(`/jobs/${id}/status`, {
-      method: "PATCH",
-      body: JSON.stringify({ status }),
-    });
+  async updateJobStatus(
+    id: number,
+    status: "ACTIVE" | "ARCHIVED",
+  ): Promise<Job> {
+    const res = await apiCall<{ status: string; data: Job }>(
+      `/jobs/${id}/status`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      },
+    );
     return res.data;
   },
 
-  async getJobBank(params?: { search?: string; page?: number; limit?: number }): Promise<{
+  async getJobBank(params?: {
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
     total: number;
     hits: JobBankHit[];
   }> {
@@ -387,28 +487,43 @@ export const api = {
   },
 
   // ── Applications ─────────────────────────────
-  async applyToJob(jobId: number): Promise<Application> {
-    const res = await apiCall<{ status: string; data: Application }>(`/applications/job/${jobId}`, {
-      method: "POST",
-    });
+  async applyToJob(jobId: number | string): Promise<Application> {
+    const res = await apiCall<{ status: string; data: Application }>(
+      `/applications/job/${jobId}`,
+      {
+        method: "POST",
+      },
+    );
     return res.data;
   },
 
   async getJobApplications(jobId: number): Promise<Application[]> {
-    const res = await apiCall<{ status: string; data: Application[] }>(`/applications/job/${jobId}`);
+    const res = await apiCall<{ status: string; data: Application[] }>(
+      `/applications/job/${jobId}`,
+    );
     return res.data;
   },
 
-  async updateApplicationStatus(applicationId: number, status: string): Promise<Application> {
-    const res = await apiCall<{ status: string; data: Application }>(`/applications/${applicationId}/status`, {
-      method: "PATCH",
-      body: JSON.stringify({ status }),
-    });
+  async updateApplicationStatus(
+    applicationId: number,
+    status: string,
+  ): Promise<Application> {
+    const res = await apiCall<{ status: string; data: Application }>(
+      `/applications/${applicationId}/status`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      },
+    );
     return res.data;
   },
 
   // ── Messages ─────────────────────────────────
-  async sendMessage(content: string, receiverId: number, receiverRole: "JOB_SEEKER" | "COMPANY_RECRUITER"): Promise<Message> {
+  async sendMessage(
+    content: string,
+    receiverId: number,
+    receiverRole: "JOB_SEEKER" | "COMPANY_RECRUITER",
+  ): Promise<Message> {
     const res = await apiCall<{ status: string; data: Message }>("/messages", {
       method: "POST",
       body: JSON.stringify({ content, receiverId, receiverRole }),
@@ -417,33 +532,43 @@ export const api = {
   },
 
   async getReceivedMessages(): Promise<Message[]> {
-    const res = await apiCall<{ status: string; results: number; data: { messages: Message[] } }>("/messages/received");
+    const res = await apiCall<{
+      status: string;
+      results: number;
+      data: { messages: Message[] };
+    }>("/messages/received");
     return res.data.messages;
   },
 
   async getConversation(otherId: number, role: string): Promise<Message[]> {
-    const res = await apiCall<{ status: string; results: number; data: { messages: Message[] } }>(
-      `/messages/${otherId}?role=${role}`
-    );
+    const res = await apiCall<{
+      status: string;
+      results: number;
+      data: { messages: Message[] };
+    }>(`/messages/${otherId}?role=${role}`);
     return res.data.messages;
   },
 
   // ── Saved ────────────────────────────────────
   async getSavedJobs(): Promise<SavedJobEntry[]> {
-    const res = await apiCall<{ status: string; data: SavedJobEntry[] }>("/saved/jobs");
+    const res = await apiCall<{ status: string; data: SavedJobEntry[] }>(
+      "/saved/jobs",
+    );
     return res.data;
   },
 
-  async saveJob(jobId: number): Promise<void> {
+  async saveJob(jobId: number | string): Promise<void> {
     await apiCall(`/saved/jobs/${jobId}`, { method: "POST" });
   },
 
-  async unsaveJob(jobId: number): Promise<void> {
+  async unsaveJob(jobId: number | string): Promise<void> {
     await apiCall(`/saved/jobs/${jobId}`, { method: "DELETE" });
   },
 
   async getSavedCompanies(): Promise<SavedCompanyEntry[]> {
-    const res = await apiCall<{ status: string; data: SavedCompanyEntry[] }>("/saved/companies");
+    const res = await apiCall<{ status: string; data: SavedCompanyEntry[] }>(
+      "/saved/companies",
+    );
     return res.data;
   },
 
@@ -471,21 +596,32 @@ export const api = {
 
   // ── AI / Matchmaking ─────────────────────────
   async matchmake(jobAddId: number, jobseekerId: number): Promise<unknown[]> {
-    const res = await apiCall<{ status: string; data: unknown[] }>("/matchmake", {
-      method: "POST",
-      body: JSON.stringify({ jobAddId, jobseekerId }),
-    });
+    const res = await apiCall<{ status: string; data: unknown[] }>(
+      "/matchmake",
+      {
+        method: "POST",
+        body: JSON.stringify({ jobAddId, jobseekerId }),
+      },
+    );
     return res.data;
   },
 
-  async aiHealthCheck(): Promise<{ status: string; timestamp: string; ai: unknown }> {
+  async aiHealthCheck(): Promise<{
+    status: string;
+    timestamp: string;
+    ai: unknown;
+  }> {
     return apiCall("/api_health");
   },
 };
 
 // ━━━ Backward compat — keep `db` export for CvBuilder ━━━
 export const db = {
-  uploadGeneratedCv(userId: number, base64Pdf: string, _fileName: string): void {
+  uploadGeneratedCv(
+    userId: number,
+    base64Pdf: string,
+    _fileName: string,
+  ): void {
     // For CV, we update the jobseeker's cv field
     api.updateJobSeeker(userId, { cv: base64Pdf }).catch(() => {});
   },
