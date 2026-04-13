@@ -1,10 +1,11 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { api, type User, type UserRole } from "@/lib/api";
 
 export type { User, UserRole };
 
 interface AuthContextType {
   user: User | null;
+  loading: boolean;
   isAuthenticated: boolean;
   isEmployer: boolean;
   login: (email: string, password: string, role: UserRole) => Promise<void>;
@@ -27,11 +28,13 @@ interface AuthContextType {
   }) => Promise<void>;
   logout: () => void;
   updateProfile: (data: Record<string, unknown>) => Promise<void>;
+  refreshProfile: () => Promise<void>;
   setUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  loading: true,
   isAuthenticated: false,
   isEmployer: false,
   login: async () => {},
@@ -39,11 +42,41 @@ const AuthContext = createContext<AuthContextType>({
   registerCompanyRecruiter: async () => {},
   logout: () => {},
   updateProfile: async () => {},
+  refreshProfile: async () => {},
   setUser: () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => api.getStoredUser());
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // On mount: if we have a token + login info, fetch fresh profile from API
+  useEffect(() => {
+    const info = api.getStoredLoginInfo();
+    if (!info) {
+      setLoading(false);
+      return;
+    }
+    const fetchProfile = async () => {
+      try {
+        let freshUser: User;
+        if (info.role === "COMPANY_RECRUITER") {
+          freshUser = await api.getCompanyRecruiter(info.id);
+        } else {
+          freshUser = await api.getJobSeeker(info.id);
+        }
+        // Merge token back since profile endpoints don't return it
+        setUser({ ...freshUser, token: info.token, role: info.role });
+      } catch {
+        // Token expired or invalid — clear
+        api.logout();
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   const login = useCallback(async (email: string, password: string, role: UserRole) => {
     let loggedIn: User;
@@ -64,7 +97,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     personalStatement?: string;
   }) => {
     await api.registerJobSeeker(data);
-    // Auto-login after register
     const loggedIn = await api.loginJobSeeker(data.email, data.password);
     setUser(loggedIn);
   }, []);
@@ -79,7 +111,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logoUrl?: string;
   }) => {
     await api.registerCompanyRecruiter(data);
-    // Auto-login after register
     const loggedIn = await api.loginCompanyRecruiter(data.email, data.password);
     setUser(loggedIn);
   }, []);
@@ -88,6 +119,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.logout();
     setUser(null);
   }, []);
+
+  const refreshProfile = useCallback(async () => {
+    if (!user) return;
+    try {
+      let freshUser: User;
+      if (user.role === "COMPANY_RECRUITER") {
+        freshUser = await api.getCompanyRecruiter(user.id);
+      } else {
+        freshUser = await api.getJobSeeker(user.id);
+      }
+      setUser((prev) => prev ? { ...prev, ...freshUser } : prev);
+    } catch {}
+  }, [user]);
 
   const updateProfile = useCallback(async (data: Record<string, unknown>) => {
     if (!user) throw new Error("Not authenticated");
@@ -104,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        loading,
         isAuthenticated: !!user,
         isEmployer: user?.role === "COMPANY_RECRUITER",
         login,
@@ -111,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         registerCompanyRecruiter,
         logout,
         updateProfile,
+        refreshProfile,
         setUser,
       }}
     >

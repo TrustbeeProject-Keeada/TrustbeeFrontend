@@ -1,7 +1,6 @@
 /**
  * TrustBee — API layer connected to real backend.
- * All methods are async and return parsed responses.
- * localStorage is used only for token + user cache.
+ * Token stored in localStorage; user data fetched fresh each session.
  */
 
 // ━━━ API Base URL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -118,7 +117,6 @@ export interface SavedCompanyEntry {
   company: JobCompany;
 }
 
-// Legacy compat types
 export interface RegisterJobSeekerRequest {
   firstName: string;
   lastName: string;
@@ -143,7 +141,6 @@ export interface LoginRequest {
   password: string;
 }
 
-// Keep for backward compat with AuthContext
 export interface RegisterRequest {
   firstName: string;
   lastName: string;
@@ -161,7 +158,8 @@ export type UpdateProfileRequest = Record<string, unknown>;
 
 // ━━━ Storage keys ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const TOKEN_KEY = "trustbee_token";
-const USER_KEY = "trustbee_user";
+// Minimal login info stored temporarily to bootstrap the session
+const LOGIN_INFO_KEY = "trustbee_login_info";
 
 // ━━━ API helper ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export class ApiError extends Error {
@@ -196,10 +194,15 @@ async function apiCall<T = unknown>(endpoint: string, options: RequestInit = {})
     throw new ApiError(msg, res.status);
   }
 
-  // Handle 204 No Content
   if (res.status === 204) return undefined as T;
-
   return res.json();
+}
+
+// ━━━ Minimal login info (id, role, token) ━━━━━━━
+interface LoginInfo {
+  id: number;
+  role: UserRole;
+  token: string;
 }
 
 // ━━━ API methods ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -212,7 +215,7 @@ export const api = {
     });
     const user = data.jobseeker;
     localStorage.setItem(TOKEN_KEY, user.token);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: user.id, role: user.role, token: user.token }));
     return user;
   },
 
@@ -223,7 +226,7 @@ export const api = {
     });
     const user = data.companyRecruiter;
     localStorage.setItem(TOKEN_KEY, user.token);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: user.id, role: user.role, token: user.token }));
     return user;
   },
 
@@ -245,12 +248,13 @@ export const api = {
 
   logout() {
     localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(LOGIN_INFO_KEY);
   },
 
-  getStoredUser(): User | null {
+  /** Returns minimal login info (id, role, token) — NOT full user data */
+  getStoredLoginInfo(): LoginInfo | null {
     try {
-      const stored = localStorage.getItem(USER_KEY);
+      const stored = localStorage.getItem(LOGIN_INFO_KEY);
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -275,14 +279,7 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(data),
     });
-    const updated = res.jobseeker;
-    // Update cached user
-    const stored = this.getStoredUser();
-    if (stored && stored.id === id) {
-      const merged = { ...stored, ...updated };
-      localStorage.setItem(USER_KEY, JSON.stringify(merged));
-    }
-    return updated;
+    return res.jobseeker;
   },
 
   async deleteJobSeeker(id: number): Promise<void> {
@@ -290,8 +287,9 @@ export const api = {
   },
 
   // ── Company Recruiters ────────────────────────
-  async getCompanyRecruiter(id: number): Promise<{ status: string; data: User }> {
-    return apiCall(`/companyrecruiter/${id}`);
+  async getCompanyRecruiter(id: number): Promise<User> {
+    const res = await apiCall<{ status: string; data: User }>(`/companyrecruiter/${id}`);
+    return res.data;
   },
 
   async updateCompanyRecruiter(id: number, data: Record<string, unknown>): Promise<User> {
@@ -299,13 +297,7 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(data),
     });
-    const updated = res.data;
-    const stored = this.getStoredUser();
-    if (stored && stored.id === id) {
-      const merged = { ...stored, ...updated };
-      localStorage.setItem(USER_KEY, JSON.stringify(merged));
-    }
-    return updated;
+    return res.data;
   },
 
   async deleteCompanyRecruiter(id: number): Promise<void> {
@@ -482,4 +474,3 @@ export const api = {
     return apiCall("/api_health");
   },
 };
-
