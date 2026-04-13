@@ -1,4 +1,11 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  ReactNode,
+} from "react";
 import { api, type User, type UserRole } from "@/lib/api";
 
 export type { User, UserRole };
@@ -61,7 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         let freshUser: User;
         if (info.role === "COMPANY_RECRUITER") {
-          freshUser = await api.getCompanyRecruiter(info.id);
+          const res = await api.getCompanyRecruiter(info.id);
+          freshUser = res.data;
         } else {
           freshUser = await api.getJobSeeker(info.id);
         }
@@ -78,42 +86,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchProfile();
   }, []);
 
-  const login = useCallback(async (email: string, password: string, role: UserRole) => {
-    let loggedIn: User;
-    if (role === "COMPANY_RECRUITER") {
-      loggedIn = await api.loginCompanyRecruiter(email, password);
-    } else {
-      loggedIn = await api.loginJobSeeker(email, password);
-    }
-    setUser(loggedIn);
-  }, []);
+  const login = useCallback(
+    async (email: string, password: string, role: UserRole) => {
+      let loggedIn: User;
+      if (role === "COMPANY_RECRUITER") {
+        loggedIn = await api.loginCompanyRecruiter(email, password);
+      } else {
+        loggedIn = await api.loginJobSeeker(email, password);
+      }
+      setUser(loggedIn);
+    },
+    [],
+  );
 
-  const registerJobSeeker = useCallback(async (data: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    password: string;
-    cv?: string;
-    personalStatement?: string;
-  }) => {
-    await api.registerJobSeeker(data);
-    const loggedIn = await api.loginJobSeeker(data.email, data.password);
-    setUser(loggedIn);
-  }, []);
+  const registerJobSeeker = useCallback(
+    async (data: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      password: string;
+      cv?: string;
+      personalStatement?: string;
+    }) => {
+      await api.registerJobSeeker(data);
+      const loggedIn = await api.loginJobSeeker(data.email, data.password);
+      setUser(loggedIn);
+    },
+    [],
+  );
 
-  const registerCompanyRecruiter = useCallback(async (data: {
-    email: string;
-    password: string;
-    companyName: string;
-    organizationNumber: number;
-    phoneNumber: string;
-    description?: string;
-    logoUrl?: string;
-  }) => {
-    await api.registerCompanyRecruiter(data);
-    const loggedIn = await api.loginCompanyRecruiter(data.email, data.password);
-    setUser(loggedIn);
-  }, []);
+  const registerCompanyRecruiter = useCallback(
+    async (data: {
+      email: string;
+      password: string;
+      companyName: string;
+      organizationNumber: number;
+      phoneNumber: string;
+      description?: string;
+      logoUrl?: string;
+    }) => {
+      await api.registerCompanyRecruiter(data);
+      const loggedIn = await api.loginCompanyRecruiter(
+        data.email,
+        data.password,
+      );
+      setUser(loggedIn);
+    },
+    [],
+  );
 
   const logout = useCallback(() => {
     api.logout();
@@ -121,28 +141,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshProfile = useCallback(async () => {
-    if (!user) return;
-    try {
-      let freshUser: User;
-      if (user.role === "COMPANY_RECRUITER") {
-        freshUser = await api.getCompanyRecruiter(user.id);
-      } else {
-        freshUser = await api.getJobSeeker(user.id);
-      }
-      setUser((prev) => prev ? { ...prev, ...freshUser } : prev);
-    } catch {}
-  }, [user]);
+    // Get current user from setUser callback to avoid dependency on user state
+    setUser((currentUser) => {
+      if (!currentUser) return currentUser;
 
-  const updateProfile = useCallback(async (data: Record<string, unknown>) => {
-    if (!user) throw new Error("Not authenticated");
-    let updated: User;
-    if (user.role === "COMPANY_RECRUITER") {
-      updated = await api.updateCompanyRecruiter(user.id, data);
-    } else {
-      updated = await api.updateJobSeeker(user.id, data);
-    }
-    setUser((prev) => prev ? { ...prev, ...updated } : prev);
-  }, [user]);
+      // Async fetch in background
+      (async () => {
+        try {
+          let freshUser: User;
+          if (currentUser.role === "COMPANY_RECRUITER") {
+            const res = await api.getCompanyRecruiter(currentUser.id);
+            freshUser = res.data;
+          } else {
+            freshUser = await api.getJobSeeker(currentUser.id);
+          }
+          setUser((prev) => (prev ? { ...prev, ...freshUser } : prev));
+        } catch (error) {
+          console.error("Failed to refresh profile:", error);
+        }
+      })();
+
+      return currentUser;
+    });
+  }, []);
+
+  const updateProfile = useCallback(
+    async (data: Record<string, unknown>) => {
+      if (!user) throw new Error("Not authenticated");
+      let updated: User;
+      if (user.role === "COMPANY_RECRUITER") {
+        updated = await api.updateCompanyRecruiter(user.id, data);
+      } else {
+        updated = await api.updateJobSeeker(user.id, data);
+      }
+      setUser((prev) => (prev ? { ...prev, ...updated } : prev));
+    },
+    [user],
+  );
 
   return (
     <AuthContext.Provider
@@ -168,3 +203,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
+// @refresh reset

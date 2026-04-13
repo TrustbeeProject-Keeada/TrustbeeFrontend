@@ -7,6 +7,10 @@ import { toast } from "sonner";
 interface ParsedResult {
   score?: number; // 0-100
   explanation?: string;
+  strengths?: string[];
+  weaknesses?: string[];
+  finalRecommendation?: string;
+  criticalGaps?: string[];
 }
 
 function parseMatchmakeResponse(res: unknown): ParsedResult {
@@ -20,6 +24,7 @@ function parseMatchmakeResponse(res: unknown): ParsedResult {
       if (typeof item === "object" && item !== null) {
         const obj = item as Record<string, unknown>;
         const scoreKeys = [
+          "Score",
           "score",
           "percent",
           "percentage",
@@ -27,6 +32,7 @@ function parseMatchmakeResponse(res: unknown): ParsedResult {
           "confidence",
         ];
         const explainKeys = [
+          "Explanation",
           "explanation",
           "reason",
           "details",
@@ -48,6 +54,19 @@ function parseMatchmakeResponse(res: unknown): ParsedResult {
                 : undefined,
           explanation:
             typeof explanationVal === "string" ? explanationVal : undefined,
+          strengths: Array.isArray(obj["Strengths"])
+            ? (obj["Strengths"] as string[])
+            : undefined,
+          weaknesses: Array.isArray(obj["WeaknessesGaps"])
+            ? (obj["WeaknessesGaps"] as string[])
+            : undefined,
+          finalRecommendation:
+            typeof obj["FinalRecommendation"] === "string"
+              ? (obj["FinalRecommendation"] as string)
+              : undefined,
+          criticalGaps: Array.isArray(obj["CriticalGaps"])
+            ? (obj["CriticalGaps"] as string[])
+            : undefined,
         };
       }
     }
@@ -55,9 +74,10 @@ function parseMatchmakeResponse(res: unknown): ParsedResult {
     // If object
     if (typeof res === "object" && res !== null) {
       const obj = res as Record<string, unknown>;
-      // some APIs wrap with { data: { score:.., explanation:.. } }
+      // some APIs wrap with { data: { Score:.., Explanation:.. } }
       const candidate = (obj["data"] as Record<string, unknown>) ?? obj;
       const scoreKeys = [
+        "Score",
         "score",
         "percent",
         "percentage",
@@ -65,6 +85,7 @@ function parseMatchmakeResponse(res: unknown): ParsedResult {
         "confidence",
       ];
       const explainKeys = [
+        "Explanation",
         "explanation",
         "reason",
         "details",
@@ -86,6 +107,31 @@ function parseMatchmakeResponse(res: unknown): ParsedResult {
               : undefined,
         explanation:
           typeof explanationVal === "string" ? explanationVal : undefined,
+        strengths: Array.isArray(
+          (candidate as Record<string, unknown>)["Strengths"],
+        )
+          ? ((candidate as Record<string, unknown>)["Strengths"] as string[])
+          : undefined,
+        weaknesses: Array.isArray(
+          (candidate as Record<string, unknown>)["WeaknessesGaps"],
+        )
+          ? ((candidate as Record<string, unknown>)[
+              "WeaknessesGaps"
+            ] as string[])
+          : undefined,
+        finalRecommendation:
+          typeof (candidate as Record<string, unknown>)[
+            "FinalRecommendation"
+          ] === "string"
+            ? ((candidate as Record<string, unknown>)[
+                "FinalRecommendation"
+              ] as string)
+            : undefined,
+        criticalGaps: Array.isArray(
+          (candidate as Record<string, unknown>)["CriticalGaps"],
+        )
+          ? ((candidate as Record<string, unknown>)["CriticalGaps"] as string[])
+          : undefined,
       };
     }
 
@@ -190,10 +236,10 @@ export default function EvaluationWheel({ jobId }: { jobId: number | string }) {
   const offset = circumference - (displayScore / 100) * circumference;
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-4">
       <button
         onClick={handleClick}
-        className="relative flex h-12 w-12 items-center justify-center rounded-full bg-transparent hover:scale-[1.02] active:scale-[0.98] transition-transform"
+        className="relative flex h-12 w-12 items-center justify-center rounded-full bg-transparent hover:scale-[1.02] active:scale-[0.98] transition-transform flex-shrink-0"
         aria-label="Evaluate fit"
       >
         <svg width="48" height="48" viewBox="0 0 48 48">
@@ -236,11 +282,11 @@ export default function EvaluationWheel({ jobId }: { jobId: number | string }) {
         </svg>
       </button>
 
-      {/* Explanation panel */}
+      {/* Explanation panel - compact and inline */}
       {open && (
-        <div className="max-w-xl rounded-md border bg-white p-3 text-sm shadow-md">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-left">
+        <div className="rounded-md border bg-white p-3 text-sm shadow-md flex-1 max-w-sm">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div>
               <div className="text-xs text-muted-foreground">Evaluation</div>
               <div className="font-semibold text-sm">
                 {score !== null ? `${score}% fit` : "Result"}
@@ -248,12 +294,12 @@ export default function EvaluationWheel({ jobId }: { jobId: number | string }) {
             </div>
             <button
               onClick={() => setOpen(false)}
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className="text-xs text-muted-foreground hover:text-foreground flex-shrink-0"
             >
-              Close
+              ✕
             </button>
           </div>
-          <div className="mt-2 text-sm text-muted-foreground whitespace-pre-line">
+          <div className="text-sm text-muted-foreground whitespace-pre-line">
             {explanation ? explanation : "No explanation provided by the AI."}
           </div>
         </div>

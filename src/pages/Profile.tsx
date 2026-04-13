@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Camera,
   Briefcase,
@@ -8,13 +8,19 @@ import {
   FileText,
   Download,
   Loader2,
+  Eye,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { CvBuilder } from "@/components/CvBuilder";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,10 +31,8 @@ export default function Profile() {
   const { user, updateProfile, refreshProfile } = useAuth();
   const isRecruiter = user?.role === "COMPANY_RECRUITER";
 
-  // Fetch fresh profile on mount
-  useEffect(() => {
-    refreshProfile();
-  }, []);
+  // User is already loaded from AuthContext on app mount, no need to refresh here
+  // Fetching happens in AuthProvider on app boot
 
   // Job seeker fields
   const [firstName, setFirstName] = useState(user?.firstName || "");
@@ -191,9 +195,15 @@ export default function Profile() {
                   {isRecruiter ? companyName : `${firstName} ${lastName}`}
                 </h2>
                 <p className="text-sm text-muted-foreground">{user?.email}</p>
-                {user?.phoneNumber && <p className="text-sm text-muted-foreground">{user.phoneNumber}</p>}
+                {user?.phoneNumber && (
+                  <p className="text-sm text-muted-foreground">
+                    {user.phoneNumber}
+                  </p>
+                )}
                 {(user?.city || user?.country) && (
-                  <p className="text-sm text-muted-foreground">{[user.city, user.country].filter(Boolean).join(", ")}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {[user.city, user.country].filter(Boolean).join(", ")}
+                  </p>
                 )}
                 <span className="mt-1 inline-block rounded-full bg-accent/15 px-3 py-0.5 text-xs font-medium text-accent">
                   {isRecruiter ? "Company Recruiter" : "Job Seeker"}
@@ -201,7 +211,13 @@ export default function Profile() {
               </div>
               {/* CV Preview button — only for job seekers with a CV */}
               {!isRecruiter && user?.cv && (
-                <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => setCvPreviewOpen(true)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 gap-1.5"
+                  onClick={() => setCvPreviewOpen(true)}
+                >
                   <Eye className="h-4 w-4" /> Preview CV
                 </Button>
               )}

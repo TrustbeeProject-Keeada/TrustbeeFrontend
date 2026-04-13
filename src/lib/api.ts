@@ -313,7 +313,7 @@ export const api = {
     const stored = this.getStoredUser();
     if (stored && stored.id === id) {
       const merged = { ...stored, ...updated };
-      localStorage.setItem(USER_KEY, JSON.stringify(merged));
+      localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: merged.id, role: merged.role, token: merged.token }));
     }
     return updated;
   },
@@ -344,7 +344,7 @@ export const api = {
     const stored = this.getStoredUser();
     if (stored && stored.id === id) {
       const merged = { ...stored, ...updated };
-      localStorage.setItem(USER_KEY, JSON.stringify(merged));
+      localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: merged.id, role: merged.role, token: merged.token }));
     }
     return updated;
   },
