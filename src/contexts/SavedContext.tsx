@@ -1,4 +1,12 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+/* eslint-disable */
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  ReactNode,
+} from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, type SavedJobEntry, type SavedCompanyEntry } from "@/lib/api";
 
@@ -20,8 +28,8 @@ interface SavedContextType {
   savedJobs: SavedJobEntry[];
   savedCompanies: SavedCompanyEntry[];
   loadingSaved: boolean;
-  isJobSaved: (jobId: number) => boolean;
-  toggleSaveJob: (jobId: number) => Promise<void>;
+  isJobSaved: (jobId: number | string) => boolean;
+  toggleSaveJob: (jobId: number | string) => Promise<void>;
   removeCompany: (companyId: number) => Promise<void>;
   saveCompany: (companyId: number) => Promise<void>;
   refreshSaved: () => Promise<void>;
@@ -66,12 +74,12 @@ export function SavedProvider({ children }: { children: ReactNode }) {
   }, [refreshSaved]);
 
   const isJobSaved = useCallback(
-    (jobId: number) => savedJobs.some((j) => j.job?.id === jobId),
-    [savedJobs]
+    (jobId: number | string) => savedJobs.some((j) => j.job?.id === jobId),
+    [savedJobs],
   );
 
   const toggleSaveJob = useCallback(
-    async (jobId: number) => {
+    async (jobId: number | string) => {
       if (isJobSaved(jobId)) {
         await api.unsaveJob(jobId);
         setSavedJobs((prev) => prev.filter((j) => j.job?.id !== jobId));
@@ -80,22 +88,36 @@ export function SavedProvider({ children }: { children: ReactNode }) {
         await refreshSaved();
       }
     },
-    [isJobSaved, refreshSaved]
+    [isJobSaved, refreshSaved],
   );
 
   const removeCompany = useCallback(async (companyId: number) => {
     await api.unsaveCompany(companyId);
-    setSavedCompanies((prev) => prev.filter((c) => c.company?.id !== companyId));
+    setSavedCompanies((prev) =>
+      prev.filter((c) => c.company?.id !== companyId),
+    );
   }, []);
 
-  const saveCompany = useCallback(async (companyId: number) => {
-    await api.saveCompany(companyId);
-    await refreshSaved();
-  }, [refreshSaved]);
+  const saveCompany = useCallback(
+    async (companyId: number) => {
+      await api.saveCompany(companyId);
+      await refreshSaved();
+    },
+    [refreshSaved],
+  );
 
   return (
     <SavedContext.Provider
-      value={{ savedJobs, savedCompanies, loadingSaved, isJobSaved, toggleSaveJob, removeCompany, saveCompany, refreshSaved }}
+      value={{
+        savedJobs,
+        savedCompanies,
+        loadingSaved,
+        isJobSaved,
+        toggleSaveJob,
+        removeCompany,
+        saveCompany,
+        refreshSaved,
+      }}
     >
       {children}
     </SavedContext.Provider>

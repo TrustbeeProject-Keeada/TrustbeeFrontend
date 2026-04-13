@@ -1,8 +1,25 @@
 import { useState, useEffect, useMemo } from "react";
-import { Search, MapPin, Briefcase, Bookmark, ChevronLeft, ChevronRight, ExternalLink, Share2, ThumbsDown, X } from "lucide-react";
+import {
+  Search,
+  MapPin,
+  Briefcase,
+  Bookmark,
+  ChevronRight,
+  ChevronLeft,
+  ExternalLink,
+  X,
+} from "lucide-react";
+import { Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useJobs, type Job } from "@/contexts/JobContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,11 +44,14 @@ function MatchBubble({ result }: { result: MatchResult }) {
       <button
         className={cn(
           "flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold transition-transform hover:scale-110 cursor-pointer",
-          color
+          color,
         )}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
-        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(!open);
+        }}
         aria-label={`Match score ${score}%`}
       >
         {score}%
@@ -40,13 +60,25 @@ function MatchBubble({ result }: { result: MatchResult }) {
         <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-lg border bg-popover p-4 text-sm text-popover-foreground shadow-lg">
           <div className="mb-2 flex items-center justify-between">
             <span className="font-semibold">Match Analysis</span>
-            <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", color)}>{score}%</span>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-xs font-bold",
+                color,
+              )}
+            >
+              {score}%
+            </span>
           </div>
-          <p className="text-muted-foreground leading-relaxed">{result.explanation}</p>
+          <p className="text-muted-foreground leading-relaxed">
+            {result.explanation}
+          </p>
           {result.matchedKeywords.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {result.matchedKeywords.map((kw) => (
-                <span key={kw} className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                <span
+                  key={kw}
+                  className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+                >
                   {kw}
                 </span>
               ))}
@@ -54,10 +86,15 @@ function MatchBubble({ result }: { result: MatchResult }) {
           )}
           {result.missingKeywords.length > 0 && (
             <div className="mt-2">
-              <span className="text-[10px] text-muted-foreground">Consider adding:</span>
+              <span className="text-[10px] text-muted-foreground">
+                Consider adding:
+              </span>
               <div className="mt-1 flex flex-wrap gap-1">
                 {result.missingKeywords.map((kw) => (
-                  <span key={kw} className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+                  <span
+                    key={kw}
+                    className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive"
+                  >
                     {kw}
                   </span>
                 ))}
@@ -94,13 +131,17 @@ function JobCard({
         "w-full text-left rounded-lg border p-4 transition-all cursor-pointer",
         isSelected
           ? "border-primary bg-primary/5 shadow-sm"
-          : "border-border bg-card hover:border-primary/40 hover:shadow-sm"
+          : "border-border bg-card hover:border-primary/40 hover:shadow-sm",
       )}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm truncate text-foreground">{job.title}</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">{job.company?.companyName}</p>
+          <h3 className="font-semibold text-sm truncate text-foreground">
+            {job.title}
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {job.company?.companyName}
+          </p>
           {(job.city || job.country) && (
             <p className="text-xs text-muted-foreground mt-0.5">
               {[job.city, job.country].filter(Boolean).join(", ")}
@@ -119,9 +160,14 @@ function JobCard({
           <button
             className={cn(
               "p-1 rounded transition-colors",
-              isSaved ? "text-accent" : "text-muted-foreground hover:text-accent"
+              isSaved
+                ? "text-accent"
+                : "text-muted-foreground hover:text-accent",
             )}
-            onClick={(e) => { e.stopPropagation(); onSave(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSave();
+            }}
             aria-label="Save job"
           >
             <Bookmark className={cn("h-4 w-4", isSaved && "fill-current")} />
@@ -154,9 +200,15 @@ function JobDetailPanel({
         <div className="min-w-0 flex-1">
           <h2 className="text-xl font-bold text-foreground">{job.title}</h2>
           <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{job.company?.companyName}</span>
+            <span className="font-medium text-foreground">
+              {job.company?.companyName}
+            </span>
             {job.company?.logoUrl && (
-              <img src={job.company.logoUrl} alt="" className="h-5 w-5 rounded object-cover" />
+              <img
+                src={job.company.logoUrl}
+                alt=""
+                className="h-5 w-5 rounded object-cover"
+              />
             )}
           </div>
           {(job.city || job.country) && (
@@ -164,9 +216,16 @@ function JobDetailPanel({
               {[job.city, job.country].filter(Boolean).join(", ")}
             </p>
           )}
-          {job.category && <p className="text-sm text-muted-foreground">{job.category}</p>}
+          {job.category && (
+            <p className="text-sm text-muted-foreground">{job.category}</p>
+          )}
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} className="lg:hidden shrink-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          className="lg:hidden shrink-0"
+        >
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -197,11 +256,18 @@ function JobDetailPanel({
             <MatchBubble result={matchResult} />
             <span className="text-sm font-semibold">Match Score</span>
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">{matchResult.explanation}</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {matchResult.explanation}
+          </p>
           {matchResult.matchedKeywords.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {matchResult.matchedKeywords.map((kw) => (
-                <span key={kw} className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{kw}</span>
+                <span
+                  key={kw}
+                  className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                >
+                  {kw}
+                </span>
               ))}
             </div>
           )}
@@ -210,7 +276,9 @@ function JobDetailPanel({
 
       {/* Job info */}
       <div className="mt-6">
-        <h3 className="text-base font-semibold text-foreground">Job Information</h3>
+        <h3 className="text-base font-semibold text-foreground">
+          Job Information
+        </h3>
         <div className="mt-3 space-y-3">
           {job.category && (
             <div className="flex items-center gap-2 text-sm">
@@ -225,12 +293,14 @@ function JobDetailPanel({
             </div>
           )}
           {job.status && (
-            <span className={cn(
-              "inline-block rounded-full px-2.5 py-0.5 text-xs font-medium",
-              job.status === "ACTIVE"
-                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                : "bg-muted text-muted-foreground"
-            )}>
+            <span
+              className={cn(
+                "inline-block rounded-full px-2.5 py-0.5 text-xs font-medium",
+                job.status === "ACTIVE"
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                  : "bg-muted text-muted-foreground",
+              )}
+            >
               {job.status}
             </span>
           )}
@@ -239,9 +309,15 @@ function JobDetailPanel({
 
       {/* Description */}
       <div className="mt-6">
-        <h3 className="text-base font-semibold text-foreground">Full Job Description</h3>
+        <h3 className="text-base font-semibold text-foreground">
+          Full Job Description
+        </h3>
         <div className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-          {job.description}
+          {typeof job.description === "string"
+            ? job.description
+            : (job.description as Record<string, string>)?.text_formatted ||
+              (job.description as Record<string, string>)?.text ||
+              "No description available"}
         </div>
       </div>
     </div>
@@ -249,7 +325,8 @@ function JobDetailPanel({
 }
 
 export default function Jobs() {
-  const { jobs, totalJobs, currentPage, totalPages, loading, fetchJobs } = useJobs();
+  const { jobs, totalJobs, currentPage, totalPages, loading, fetchJobs } =
+    useJobs();
   const { user } = useAuth();
   const { isJobSaved, toggleSaveJob } = useSaved();
   const [search, setSearch] = useState("");
@@ -279,38 +356,48 @@ export default function Jobs() {
 
   // Pre-compute match results for all visible jobs
   const matchResults = useMemo(() => {
-    if (!showMatch || !user) return new Map<number, MatchResult>();
-    const map = new Map<number, MatchResult>();
+    if (!showMatch || !user) return new Map<string | number, MatchResult>();
+    const map = new Map<string | number, MatchResult>();
     for (const job of jobs) {
-      map.set(job.id, matchScoreDetailed(user, job));
+      // For matchScoreDetailed, convert ID to number if it's a string
+      const numericId =
+        typeof job.id === "string" ? parseInt(job.id, 10) : job.id;
+      if (!isNaN(numericId)) {
+        map.set(job.id, matchScoreDetailed(user, job));
+      }
     }
     return map;
   }, [jobs, user, showMatch]);
 
-  const selectedMatchResult = selectedJob && showMatch ? (matchResults.get(selectedJob.id) ?? null) : null;
+  const selectedMatchResult =
+    selectedJob && showMatch
+      ? (matchResults.get(selectedJob.id) ?? null)
+      : null;
 
-  const handleSave = async (jobId: number) => {
+  const handleSave = async (jobId: number | string) => {
     if (!user) {
       toast.error("Please log in to save jobs");
       return;
     }
     try {
       await toggleSaveJob(jobId);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save job");
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      toast.error(error.message || "Failed to save job");
     }
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
       {/* Header + Filters */}
       <ScrollReveal>
-        <h1 className="text-2xl font-bold">Find Your Next Role</h1>
-        {totalJobs > 0 && (
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {totalJobs} jobs found
-          </p>
-        )}
+        <h1 className="text-3xl font-bold">Find Your Next Role</h1>
+        <p className="mt-1 text-muted-foreground">
+          Browse and filter job opportunities.
+          {totalJobs > 0 && (
+            <span className="ml-2 text-sm">({totalJobs} jobs found)</span>
+          )}
+        </p>
       </ScrollReveal>
 
       <ScrollReveal delay={60}>
@@ -321,11 +408,22 @@ export default function Jobs() {
               placeholder="Job title, keyword or company…"
               className="pl-9"
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
             />
           </div>
-          <Select value={countryFilter} onValueChange={(v) => { setCountryFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-[140px]"><SelectValue placeholder="Country" /></SelectTrigger>
+          <Select
+            value={countryFilter}
+            onValueChange={(v) => {
+              setCountryFilter(v);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Country" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All countries</SelectItem>
               <SelectItem value="Sweden">Sweden</SelectItem>
@@ -334,8 +432,16 @@ export default function Jobs() {
               <SelectItem value="Germany">Germany</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-[140px]"><SelectValue placeholder="Category" /></SelectTrigger>
+          <Select
+            value={categoryFilter}
+            onValueChange={(v) => {
+              setCategoryFilter(v);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All categories</SelectItem>
               <SelectItem value="Engineering">Engineering</SelectItem>
@@ -349,59 +455,96 @@ export default function Jobs() {
       </ScrollReveal>
 
       {loading ? (
-        <div className="py-16 text-center text-muted-foreground">Loading jobs…</div>
-      ) : jobs.length === 0 ? (
-        <div className="py-16 text-center text-muted-foreground">No jobs match your search. Try different keywords.</div>
+        <div className="py-16 text-center text-muted-foreground">
+          Loading jobs…
+        </div>
       ) : (
-        <div className="mt-5 flex gap-5" style={{ minHeight: "calc(100vh - 260px)" }}>
-          {/* Left: Job list */}
-          <div className="w-full lg:w-[420px] shrink-0 space-y-2 overflow-y-auto pr-1" style={{ maxHeight: "calc(100vh - 260px)" }}>
-            {jobs.map((job) => (
-              <JobCard
-                key={job.id}
-                job={job}
-                isSelected={selectedJob?.id === job.id}
-                isSaved={isJobSaved(job.id)}
-                showMatch={!!showMatch}
-                matchResult={matchResults.get(job.id) ?? null}
-                onSelect={() => setSelectedJob(job)}
-                onSave={() => handleSave(job.id)}
-              />
-            ))}
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-3 pt-4 pb-2">
-                <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                  <ChevronLeft className="h-4 w-4 mr-1" /> Prev
-                </Button>
-                <span className="text-xs text-muted-foreground">
-                  {currentPage} / {totalPages}
-                </span>
-                <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage((p) => p + 1)}>
-                  Next <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Right: Detail panel */}
-          <div className="hidden lg:block flex-1 sticky top-6" style={{ maxHeight: "calc(100vh - 260px)" }}>
-            {selectedJob ? (
-              <JobDetailPanel
-                job={selectedJob}
-                isSaved={isJobSaved(selectedJob.id)}
-                matchResult={selectedMatchResult}
-                showMatch={!!showMatch}
-                onSave={() => handleSave(selectedJob.id)}
-                onClose={() => setSelectedJob(null)}
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center rounded-lg border bg-card text-muted-foreground">
-                Select a job to see details
-              </div>
-            )}
-          </div>
+        <div className="mt-6 space-y-3">
+          {jobs.map((job, i) => (
+            <ScrollReveal key={job.id} delay={i * 60}>
+              <Card className="glass transition-shadow hover:shadow-md">
+                <CardContent className="flex items-center gap-4 p-5">
+                  {job.company?.logoUrl ? (
+                    <img
+                      src={job.company.logoUrl}
+                      alt={job.company.companyName}
+                      className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                      {(job.company?.companyName || "??")
+                        .slice(0, 2)
+                        .toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold truncate">{job.title}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {job.company?.companyName}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                      {(job.city || job.country) && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {[job.city, job.country].filter(Boolean).join(", ")}
+                        </span>
+                      )}
+                      {job.category && (
+                        <span className="flex items-center gap-1">
+                          <Briefcase className="h-3 w-3" />
+                          {job.category}
+                        </span>
+                      )}
+                      {job.status && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            job.status === "ACTIVE"
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {job.status}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {user?.role === "JOB_SEEKER" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={
+                          isJobSaved(job.id)
+                            ? "text-accent"
+                            : "text-muted-foreground hover:text-accent"
+                        }
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleSave(job.id);
+                        }}
+                      >
+                        <Bookmark
+                          className={`h-4 w-4 ${isJobSaved(job.id) ? "fill-current" : ""}`}
+                        />
+                      </Button>
+                    )}
+                    <Link
+                      to={`/jobs/${job.id}${job.source ? `?source=${job.source}` : ""}`}
+                    >
+                      <Button variant="ghost" size="icon">
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            </ScrollReveal>
+          ))}
+          {jobs.length === 0 && (
+            <div className="py-16 text-center text-muted-foreground">
+              No jobs match your search. Try different keywords.
+            </div>
+          )}
         </div>
       )}
 
