@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { CvBuilder } from "@/components/CvBuilder";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,8 +22,13 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function Profile() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, refreshProfile } = useAuth();
   const isRecruiter = user?.role === "COMPANY_RECRUITER";
+
+  // Fetch fresh profile on mount
+  useEffect(() => {
+    refreshProfile();
+  }, []);
 
   // Job seeker fields
   const [firstName, setFirstName] = useState(user?.firstName || "");
@@ -46,7 +52,27 @@ export default function Profile() {
 
   const [saving, setSaving] = useState(false);
   const [uploadingCv, setUploadingCv] = useState(false);
+  const [cvPreviewOpen, setCvPreviewOpen] = useState(false);
   const cvInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync form fields when user data updates (e.g. after fresh fetch)
+  useEffect(() => {
+    if (!user) return;
+    setFirstName(user.firstName || "");
+    setLastName(user.lastName || "");
+    setPhoneNumber(user.phoneNumber || "");
+    setCountry(user.country || "");
+    setCity(user.city || "");
+    setBio(user.bio || "");
+    setPortfolioLink(user.portfolioLink || "");
+    setSkills(user.skills?.join(", ") || "");
+    setLanguages(user.languages?.join(", ") || "");
+    setPersonalStatement(user.personalStatement || "");
+    setCompanyName(user.companyName || "");
+    setDescription(user.description || "");
+    setIndustry(user.industry || "");
+    setLogoUrl(user.logoUrl || "");
+  }, [user]);
 
   const handleCvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -61,12 +87,17 @@ export default function Profile() {
       reader.onload = async () => {
         const base64 = reader.result as string;
         await api.updateJobSeeker(user.id, { cv: base64 });
+        await refreshProfile();
         toast.success("CV uploaded successfully!");
+        setUploadingCv(false);
+      };
+      reader.onerror = () => {
+        toast.error("Failed to read file.");
+        setUploadingCv(false);
       };
       reader.readAsDataURL(file);
     } catch {
       toast.error("Failed to upload CV.");
-    } finally {
       setUploadingCv(false);
     }
   };
@@ -127,7 +158,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
+    <div className="mx-auto max-w-3xl px-4 py-6">
       <ScrollReveal>
         <h1 className="text-3xl font-bold">Profile</h1>
         <p className="mt-1 text-muted-foreground">
@@ -136,10 +167,10 @@ export default function Profile() {
       </ScrollReveal>
 
       <ScrollReveal delay={80}>
-        <Card className="glass mt-8">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-              <div className="relative">
+        <Card className="glass mt-4">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-start">
+              <div className="relative shrink-0">
                 {user?.profilePicture || user?.logoUrl ? (
                   <img
                     src={user.profilePicture || user.logoUrl}
@@ -147,29 +178,57 @@ export default function Profile() {
                     className="h-24 w-24 rounded-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10 text-3xl font-bold text-primary">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-2xl font-bold text-primary">
                     {initials}
                   </div>
                 )}
-                <button className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md hover:bg-accent/90 active:scale-95 transition-transform">
-                  <Camera className="h-4 w-4" />
+                <button className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md hover:bg-accent/90 active:scale-95 transition-transform">
+                  <Camera className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <div className="text-center sm:text-left">
-                <h2 className="text-xl font-semibold">
+              <div className="flex-1 text-center sm:text-left">
+                <h2 className="text-lg font-semibold">
                   {isRecruiter ? companyName : `${firstName} ${lastName}`}
                 </h2>
                 <p className="text-sm text-muted-foreground">{user?.email}</p>
-                <span className="mt-2 inline-block rounded-full bg-accent/15 px-3 py-0.5 text-xs font-medium text-accent">
+                {user?.phoneNumber && <p className="text-sm text-muted-foreground">{user.phoneNumber}</p>}
+                {(user?.city || user?.country) && (
+                  <p className="text-sm text-muted-foreground">{[user.city, user.country].filter(Boolean).join(", ")}</p>
+                )}
+                <span className="mt-1 inline-block rounded-full bg-accent/15 px-3 py-0.5 text-xs font-medium text-accent">
                   {isRecruiter ? "Company Recruiter" : "Job Seeker"}
                 </span>
               </div>
+              {/* CV Preview button — only for job seekers with a CV */}
+              {!isRecruiter && user?.cv && (
+                <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => setCvPreviewOpen(true)}>
+                  <Eye className="h-4 w-4" /> Preview CV
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
       </ScrollReveal>
 
-      <form className="mt-6 space-y-6" onSubmit={handleSubmit}>
+      {/* CV Preview Dialog */}
+      <Dialog open={cvPreviewOpen} onOpenChange={setCvPreviewOpen}>
+        <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>CV Preview</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            {user?.cv && (
+              <iframe
+                src={user.cv}
+                className="w-full h-full rounded border"
+                title="CV Preview"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
         {isRecruiter ? (
           <>
             <ScrollReveal delay={120}>
