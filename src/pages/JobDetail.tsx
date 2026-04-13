@@ -21,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSaved } from "@/contexts/SavedContext";
 import { api, type Job } from "@/lib/api";
 import { toast } from "sonner";
+import EvaluationWheel from "@/components/EvaluationWheel";
 
 export default function JobDetail() {
   const { id } = useParams();
@@ -219,6 +220,9 @@ export default function JobDetail() {
               >
                 Message Employer
               </Button>
+              {user?.role === "JOB_SEEKER" && job && (
+                <EvaluationWheel jobId={job.id} />
+              )}
             </div>
           </CardContent>
         </Card>

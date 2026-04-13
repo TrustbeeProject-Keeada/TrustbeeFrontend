@@ -1,5 +1,14 @@
 import { useState, useRef } from "react";
-import { Camera, Briefcase, GraduationCap, Globe, Upload, FileText, Download, Loader2 } from "lucide-react";
+import {
+  Camera,
+  Briefcase,
+  GraduationCap,
+  Globe,
+  Upload,
+  FileText,
+  Download,
+  Loader2,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +34,9 @@ export default function Profile() {
   const [portfolioLink, setPortfolioLink] = useState(user?.portfolioLink || "");
   const [skills, setSkills] = useState(user?.skills?.join(", ") || "");
   const [languages, setLanguages] = useState(user?.languages?.join(", ") || "");
-  const [personalStatement, setPersonalStatement] = useState(user?.personalStatement || "");
+  const [personalStatement, setPersonalStatement] = useState(
+    user?.personalStatement || "",
+  );
 
   // Company recruiter fields
   const [companyName, setCompanyName] = useState(user?.companyName || "");
@@ -78,18 +89,38 @@ export default function Profile() {
     try {
       if (isRecruiter) {
         await updateProfile({
-          companyName, description, phoneNumber, city, country, industry, logoUrl,
+          companyName,
+          description,
+          phoneNumber,
+          city,
+          country,
+          industry,
+          logoUrl,
         });
       } else {
         await updateProfile({
-          firstName, lastName, phoneNumber, country, city, bio, portfolioLink, personalStatement,
-          skills: skills.split(",").map((s) => s.trim()).filter(Boolean),
-          languages: languages.split(",").map((l) => l.trim()).filter(Boolean),
+          firstName,
+          lastName,
+          phoneNumber,
+          country,
+          city,
+          bio,
+          portfolioLink,
+          personalStatement,
+          skills: skills
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+          languages: languages
+            .split(",")
+            .map((l) => l.trim())
+            .filter(Boolean),
         });
       }
       toast.success("Profile updated!");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save");
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      toast.error(error.message || "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -99,7 +130,9 @@ export default function Profile() {
     <div className="mx-auto max-w-3xl px-4 py-10">
       <ScrollReveal>
         <h1 className="text-3xl font-bold">Profile</h1>
-        <p className="mt-1 text-muted-foreground">Manage your personal information.</p>
+        <p className="mt-1 text-muted-foreground">
+          Manage your personal information.
+        </p>
       </ScrollReveal>
 
       <ScrollReveal delay={80}>
@@ -108,7 +141,11 @@ export default function Profile() {
             <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
               <div className="relative">
                 {user?.profilePicture || user?.logoUrl ? (
-                  <img src={user.profilePicture || user.logoUrl} alt="Avatar" className="h-24 w-24 rounded-full object-cover" />
+                  <img
+                    src={user.profilePicture || user.logoUrl}
+                    alt="Avatar"
+                    className="h-24 w-24 rounded-full object-cover"
+                  />
                 ) : (
                   <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10 text-3xl font-bold text-primary">
                     {initials}
@@ -137,19 +174,67 @@ export default function Profile() {
           <>
             <ScrollReveal delay={120}>
               <Card className="glass">
-                <CardHeader><CardTitle className="flex items-center gap-2"><Briefcase className="h-4 w-4" /> Company Info</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Briefcase className="h-4 w-4" /> Company Info
+                  </CardTitle>
+                </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2"><Label>Company Name</Label><Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} /></div>
-                  <div className="space-y-2"><Label>Description</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} /></div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2"><Label>Phone</Label><Input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} /></div>
-                    <div className="space-y-2"><Label>Industry</Label><Input value={industry} onChange={(e) => setIndustry(e.target.value)} /></div>
+                  <div className="space-y-2">
+                    <Label>Company Name</Label>
+                    <Input
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Description</Label>
+                    <Textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={3}
+                    />
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2"><Label>Country</Label><Input value={country} onChange={(e) => setCountry(e.target.value)} /></div>
-                    <div className="space-y-2"><Label>City</Label><Input value={city} onChange={(e) => setCity(e.target.value)} /></div>
+                    <div className="space-y-2">
+                      <Label>Phone</Label>
+                      <Input
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Industry</Label>
+                      <Input
+                        value={industry}
+                        onChange={(e) => setIndustry(e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2"><Label>Logo URL</Label><Input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} /></div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Country</Label>
+                      <Input
+                        value={country}
+                        onChange={(e) => setCountry(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>City</Label>
+                      <Input
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Logo URL</Label>
+                    <Input
+                      type="url"
+                      value={logoUrl}
+                      onChange={(e) => setLogoUrl(e.target.value)}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             </ScrollReveal>
@@ -158,60 +243,167 @@ export default function Profile() {
           <>
             <ScrollReveal delay={120}>
               <Card className="glass">
-                <CardHeader><CardTitle className="flex items-center gap-2"><Briefcase className="h-4 w-4" /> Personal Info</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Briefcase className="h-4 w-4" /> Personal Info
+                  </CardTitle>
+                </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2"><Label>First name</Label><Input value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div>
-                    <div className="space-y-2"><Label>Last name</Label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>
+                    <div className="space-y-2">
+                      <Label>First name</Label>
+                      <Input
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Last name</Label>
+                      <Input
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2"><Label>Phone</Label><Input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} /></div>
+                  <div className="space-y-2">
+                    <Label>Phone</Label>
+                    <Input
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                    />
+                  </div>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2"><Label>Country</Label><Input value={country} onChange={(e) => setCountry(e.target.value)} /></div>
-                    <div className="space-y-2"><Label>City</Label><Input value={city} onChange={(e) => setCity(e.target.value)} /></div>
+                    <div className="space-y-2">
+                      <Label>Country</Label>
+                      <Input
+                        value={country}
+                        onChange={(e) => setCountry(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>City</Label>
+                      <Input
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2"><Label>Bio</Label><Textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} /></div>
+                  <div className="space-y-2">
+                    <Label>Bio</Label>
+                    <Textarea
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             </ScrollReveal>
 
             <ScrollReveal delay={160}>
               <Card className="glass">
-                <CardHeader><CardTitle className="flex items-center gap-2"><GraduationCap className="h-4 w-4" /> Skills & Languages</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4" /> Skills & Languages
+                  </CardTitle>
+                </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2"><Label>Skills (comma-separated)</Label><Input value={skills} onChange={(e) => setSkills(e.target.value)} placeholder="React, TypeScript, Node.js" /></div>
-                  <div className="space-y-2"><Label>Languages (comma-separated)</Label><Input value={languages} onChange={(e) => setLanguages(e.target.value)} placeholder="English, Swedish" /></div>
-                  <div className="space-y-2"><Label>Personal Statement</Label><Textarea value={personalStatement} onChange={(e) => setPersonalStatement(e.target.value)} rows={3} /></div>
+                  <div className="space-y-2">
+                    <Label>Skills (comma-separated)</Label>
+                    <Input
+                      value={skills}
+                      onChange={(e) => setSkills(e.target.value)}
+                      placeholder="React, TypeScript, Node.js"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Languages (comma-separated)</Label>
+                    <Input
+                      value={languages}
+                      onChange={(e) => setLanguages(e.target.value)}
+                      placeholder="English, Swedish"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Personal Statement</Label>
+                    <Textarea
+                      value={personalStatement}
+                      onChange={(e) => setPersonalStatement(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             </ScrollReveal>
 
             <ScrollReveal delay={200}>
               <Card className="glass">
-                <CardHeader><CardTitle className="flex items-center gap-2"><Globe className="h-4 w-4" /> Links</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" /> Links
+                  </CardTitle>
+                </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2"><Label>Portfolio URL</Label><Input type="url" value={portfolioLink} onChange={(e) => setPortfolioLink(e.target.value)} placeholder="https://myportfolio.com" /></div>
+                  <div className="space-y-2">
+                    <Label>Portfolio URL</Label>
+                    <Input
+                      type="url"
+                      value={portfolioLink}
+                      onChange={(e) => setPortfolioLink(e.target.value)}
+                      placeholder="https://myportfolio.com"
+                    />
+                  </div>
                 </CardContent>
               </Card>
             </ScrollReveal>
 
             <ScrollReveal delay={240}>
               <Card className="glass">
-                <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4" /> CV / Resume</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" /> CV / Resume
+                  </CardTitle>
+                </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex flex-wrap gap-2">
-                    <input ref={cvInputRef} type="file" accept=".pdf" className="hidden" onChange={handleCvUpload} />
-                    <Button type="button" variant="outline" size="sm" disabled={uploadingCv} onClick={() => cvInputRef.current?.click()}>
-                      {uploadingCv ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Upload className="mr-1.5 h-4 w-4" />}
+                    <input
+                      ref={cvInputRef}
+                      type="file"
+                      accept=".pdf"
+                      className="hidden"
+                      onChange={handleCvUpload}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={uploadingCv}
+                      onClick={() => cvInputRef.current?.click()}
+                    >
+                      {uploadingCv ? (
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Upload className="mr-1.5 h-4 w-4" />
+                      )}
                       Upload PDF
                     </Button>
                     <CvBuilder />
                     {user?.cv && (
-                      <Button type="button" variant="outline" size="sm" onClick={handleDownloadCv}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDownloadCv}
+                      >
                         <Download className="mr-1.5 h-4 w-4" /> Download CV
                       </Button>
                     )}
                   </div>
-                  {user?.cv && <p className="text-xs text-muted-foreground">✓ CV on file</p>}
+                  {user?.cv && (
+                    <p className="text-xs text-muted-foreground">
+                      ✓ CV on file
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </ScrollReveal>
@@ -219,7 +411,12 @@ export default function Profile() {
         )}
 
         <ScrollReveal delay={240}>
-          <Button type="submit" disabled={saving} size="lg" className="w-full bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.97] transition-transform">
+          <Button
+            type="submit"
+            disabled={saving}
+            size="lg"
+            className="w-full bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.97] transition-transform"
+          >
             {saving ? "Saving…" : "Save Changes"}
           </Button>
         </ScrollReveal>

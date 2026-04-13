@@ -199,7 +199,9 @@ async function apiCall<T = unknown>(
     try {
       const body = await res.json();
       msg = body.message || body.status || body.error || msg;
-    } catch {}
+    } catch {
+      // Unable to parse response body, use default message
+    }
     throw new ApiError(msg, res.status);
   }
 
@@ -489,7 +491,7 @@ export const api = {
   // ── Applications ─────────────────────────────
   async applyToJob(jobId: number | string): Promise<Application> {
     const res = await apiCall<{ status: string; data: Application }>(
-      `/applications/job/${jobId}`,
+      `/jobs/job_bank/${jobId}`,
       {
         method: "POST",
       },
@@ -499,7 +501,7 @@ export const api = {
 
   async getJobApplications(jobId: number): Promise<Application[]> {
     const res = await apiCall<{ status: string; data: Application[] }>(
-      `/applications/job/${jobId}`,
+      `/jobs/job_bank/${jobId}`,
     );
     return res.data;
   },
