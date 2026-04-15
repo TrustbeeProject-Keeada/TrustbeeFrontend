@@ -89,7 +89,7 @@ export default function Saved() {
                     variant="ghost"
                     size="icon"
                     className="text-muted-foreground hover:text-destructive"
-                    onClick={() => handleRemoveJob(entry.job?.id)}
+                    onClick={() => handleRemoveJob(Number(entry.job?.id))}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

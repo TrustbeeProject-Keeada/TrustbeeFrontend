@@ -101,7 +101,7 @@ export default function ManageJobs() {
                     variant="ghost"
                     size="icon"
                     title={job.status === "ARCHIVED" ? "Reactivate" : "Archive"}
-                    onClick={() => handleToggleStatus(job.id, job.status)}
+                    onClick={() => handleToggleStatus(Number(job.id), job.status)}
                   >
                     {job.status === "ARCHIVED" ? <RotateCcw className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
                   </Button>
@@ -116,7 +116,7 @@ export default function ManageJobs() {
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDelete(job.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                        <AlertDialogAction onClick={() => handleDelete(Number(job.id))} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>

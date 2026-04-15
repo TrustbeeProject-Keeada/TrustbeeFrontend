@@ -26,6 +26,7 @@ import Saved from "./pages/Saved";
 import AIAssistant from "./pages/AIAssistant";
 import Support from "./pages/Support";
 import NotFound from "./pages/NotFound";
+import CvBuilderPage from "./pages/CvBuilderPage";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,7 @@ const App = () => (
                     <Route path="/saved" element={<ProtectedRoute><Saved /></ProtectedRoute>} />
                     <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
                     <Route path="/support" element={<Support />} />
+                    <Route path="/cv-builder" element={<ProtectedRoute><CvBuilderPage /></ProtectedRoute>} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </main>
