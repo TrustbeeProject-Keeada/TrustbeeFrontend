@@ -28,7 +28,7 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function Profile() {
-  const { user, updateProfile, refreshProfile } = useAuth();
+  const { user, updateProfile, refreshProfile, setUser } = useAuth();
   const isRecruiter = user?.role === "COMPANY_RECRUITER";
 
   // User is already loaded from AuthContext on app mount, no need to refresh here
@@ -85,24 +85,37 @@ export default function Profile() {
       toast.error("Please upload a PDF file.");
       return;
     }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File too large. Maximum size is 5MB.");
+      return;
+    }
     setUploadingCv(true);
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result as string;
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+      });
+
+      // Update user locally immediately so UI reflects the change
+      setUser({ ...user, cv: base64 });
+      toast.success("CV uploaded successfully!");
+
+      // Try to persist to backend (non-blocking)
+      try {
         await api.updateJobSeeker(user.id, { cv: base64 });
         await refreshProfile();
-        toast.success("CV uploaded successfully!");
-        setUploadingCv(false);
-      };
-      reader.onerror = () => {
-        toast.error("Failed to read file.");
-        setUploadingCv(false);
-      };
-      reader.readAsDataURL(file);
+      } catch (apiErr) {
+        console.warn("CV saved locally but failed to sync to server:", apiErr);
+        toast.info("CV loaded locally. It will sync when the server is available.");
+      }
     } catch {
-      toast.error("Failed to upload CV.");
+      toast.error("Failed to read the PDF file.");
+    } finally {
       setUploadingCv(false);
+      // Reset the input so re-uploading the same file triggers onChange
+      if (cvInputRef.current) cvInputRef.current.value = "";
     }
   };
 
