@@ -9,7 +9,7 @@ import {
   ExternalLink,
   X,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
+
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useJobs, type Job } from "@/contexts/JobContext";
@@ -490,92 +490,70 @@ export default function Jobs() {
           Loading jobs…
         </div>
       ) : (
-        <div className="mt-6 space-y-3">
-          {jobs.map((job, i) => (
-            <ScrollReveal key={job.id} delay={i * 60}>
-              <Card className="glass transition-shadow hover:shadow-md">
-                <CardContent className="flex items-center gap-4 p-5">
-                  {job.company?.logoUrl ? (
-                    <img
-                      src={job.company.logoUrl}
-                      alt={job.company.companyName}
-                      className="h-12 w-12 shrink-0 rounded-lg object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-                      {(job.company?.companyName || "??")
-                        .slice(0, 2)
-                        .toUpperCase()}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold truncate">{job.title}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {job.company?.companyName}
-                    </p>
-                    <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                      {(job.city || job.country) && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {[job.city, job.country].filter(Boolean).join(", ")}
-                        </span>
-                      )}
-                      {job.category && (
-                        <span className="flex items-center gap-1">
-                          <Briefcase className="h-3 w-3" />
-                          {job.category}
-                        </span>
-                      )}
-                      {job.status && (
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            job.status === "ACTIVE"
-                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          {job.status}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {user?.role === "JOB_SEEKER" && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={
-                          isJobSaved(job.id)
-                            ? "text-accent"
-                            : "text-muted-foreground hover:text-accent"
-                        }
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleSave(job.id);
-                        }}
-                      >
-                        <Bookmark
-                          className={`h-4 w-4 ${isJobSaved(job.id) ? "fill-current" : ""}`}
-                        />
-                      </Button>
-                    )}
-                    <Link
-                      to={`/jobs/${job.id}${job.source ? `?source=${job.source}` : ""}`}
-                    >
-                      <Button variant="ghost" size="icon">
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            </ScrollReveal>
-          ))}
-          {jobs.length === 0 && (
-            <div className="py-16 text-center text-muted-foreground">
-              No jobs match your search. Try different keywords.
-            </div>
-          )}
+        <div className="mt-6 flex gap-6" style={{ minHeight: "calc(100vh - 260px)" }}>
+          {/* Left: Job list */}
+          <div className="w-full lg:w-[420px] shrink-0 space-y-2 overflow-y-auto lg:max-h-[calc(100vh-260px)] pr-1 scrollbar-thin">
+            {jobs.map((job) => (
+              <JobCard
+                key={job.id}
+                job={job}
+                isSelected={selectedJob?.id === job.id}
+                isSaved={isJobSaved(job.id)}
+                showMatch={!!showMatch}
+                matchResult={matchResults.get(job.id) ?? null}
+                onSelect={() => setSelectedJob(job)}
+                onSave={() => handleSave(job.id)}
+              />
+            ))}
+            {jobs.length === 0 && (
+              <div className="py-16 text-center text-muted-foreground">
+                No jobs match your search. Try different keywords.
+              </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-4 pb-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  {currentPage} / {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Job detail (desktop) */}
+          <div className="hidden lg:block flex-1 min-w-0 lg:max-h-[calc(100vh-260px)]">
+            {selectedJob ? (
+              <JobDetailPanel
+                job={selectedJob}
+                isSaved={isJobSaved(selectedJob.id)}
+                matchResult={selectedMatchResult}
+                showMatch={!!showMatch}
+                onSave={() => handleSave(selectedJob.id)}
+                onClose={() => setSelectedJob(null)}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-lg border bg-card text-muted-foreground">
+                Select a job to see details
+              </div>
+            )}
+          </div>
         </div>
       )}
 
