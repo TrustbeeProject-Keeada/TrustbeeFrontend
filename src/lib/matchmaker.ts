@@ -41,11 +41,16 @@ export interface MatchResult {
 }
 
 export function matchScoreDetailed(user: User, job: Job): MatchResult {
+  // Skip CV field if it's base64 data (not extractable text)
+  const cvText = user.cv && !user.cv.startsWith("data:") ? user.cv : "";
+
   const userText = [
-    user.cv || "",
+    cvText,
     user.personalStatement || "",
     user.bio || "",
     user.skills?.join(" ") || "",
+    user.firstName || "",
+    user.lastName || "",
     user.city || "",
     user.country || "",
   ].join(" ");

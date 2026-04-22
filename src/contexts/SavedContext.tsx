@@ -63,7 +63,9 @@ export function SavedProvider({ children }: { children: ReactNode }) {
       setSavedJobs(jobs);
       setSavedCompanies(companies);
     } catch (err) {
-      console.error("Failed to load saved items:", err);
+      console.error("Failed to load saved items (using empty):", err);
+      setSavedJobs([]);
+      setSavedCompanies([]);
     } finally {
       setLoadingSaved(false);
     }

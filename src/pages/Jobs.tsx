@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useJobs, type Job } from "@/contexts/JobContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,72 +29,90 @@ import { toast } from "sonner";
 import { matchScoreDetailed, type MatchResult } from "@/lib/matchmaker";
 import { cn } from "@/lib/utils";
 
-function MatchBubble({ result }: { result: MatchResult }) {
-  const [open, setOpen] = useState(false);
+function MatchBubble({ result, size = "md" }: { result: MatchResult; size?: "sm" | "md" | "lg" }) {
   const { score } = result;
 
-  const color =
+  const colorClasses =
     score >= 70
-      ? "bg-green-500 text-white"
+      ? "bg-green-500/90 text-white ring-green-500/30"
       : score >= 40
-        ? "bg-yellow-500 text-white"
-        : "bg-muted text-muted-foreground";
+        ? "bg-yellow-500/90 text-white ring-yellow-500/30"
+        : "bg-muted text-muted-foreground ring-muted-foreground/20";
+
+  const sizeClasses = {
+    sm: "h-10 w-10 text-xs",
+    md: "h-12 w-12 text-sm",
+    lg: "h-14 w-14 text-base",
+  };
 
   return (
-    <div className="relative">
-      <button
-        className={cn(
-          "flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold transition-transform hover:scale-110 cursor-pointer",
-          color,
-        )}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen(!open);
-        }}
-        aria-label={`Match score ${score}%`}
-      >
-        {score}%
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-lg border bg-popover p-4 text-sm text-popover-foreground shadow-lg">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="font-semibold">Match Analysis</span>
+    <HoverCard openDelay={100} closeDelay={200}>
+      <HoverCardTrigger asChild>
+        <button
+          className={cn(
+            "flex items-center justify-center rounded-full font-bold transition-all duration-200 hover:scale-110 hover:ring-4 cursor-pointer shadow-md",
+            colorClasses,
+            sizeClasses[size],
+          )}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Match score ${score}%`}
+        >
+          {score}%
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent side="left" align="start" className="w-80 p-0">
+        <div className="p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-sm font-semibold">Match Analysis</span>
             <span
               className={cn(
-                "rounded-full px-2 py-0.5 text-xs font-bold",
-                color,
+                "rounded-full px-2.5 py-1 text-xs font-bold",
+                colorClasses,
               )}
             >
               {score}%
             </span>
           </div>
-          <p className="text-muted-foreground leading-relaxed">
+
+          {/* Progress bar */}
+          <div className="mb-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all",
+                score >= 70 ? "bg-green-500" : score >= 40 ? "bg-yellow-500" : "bg-muted-foreground/50",
+              )}
+              style={{ width: `${score}%` }}
+            />
+          </div>
+
+          <p className="text-sm text-muted-foreground leading-relaxed">
             {result.explanation}
           </p>
+
           {result.matchedKeywords.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {result.matchedKeywords.map((kw) => (
-                <span
-                  key={kw}
-                  className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary"
-                >
-                  {kw}
-                </span>
-              ))}
+            <div className="mt-3">
+              <span className="text-xs font-medium text-foreground">Matching Skills</span>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {result.matchedKeywords.map((kw) => (
+                  <span
+                    key={kw}
+                    className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                  >
+                    ✓ {kw}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
+
           {result.missingKeywords.length > 0 && (
-            <div className="mt-2">
-              <span className="text-[10px] text-muted-foreground">
-                Consider adding:
-              </span>
-              <div className="mt-1 flex flex-wrap gap-1">
+            <div className="mt-3">
+              <span className="text-xs font-medium text-foreground">Consider Adding</span>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {result.missingKeywords.map((kw) => (
                   <span
                     key={kw}
-                    className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive"
+                    className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"
                   >
                     {kw}
                   </span>
@@ -101,9 +120,16 @@ function MatchBubble({ result }: { result: MatchResult }) {
               </div>
             </div>
           )}
+
+          {result.locationMatch && (
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-green-600">
+              <MapPin className="h-3 w-3" />
+              <span>Location match</span>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </HoverCardContent>
+    </HoverCard>
   );
 }
 
@@ -154,7 +180,7 @@ function JobCard({
           )}
         </div>
         <div className="flex flex-col items-center gap-1.5 shrink-0">
-          {showMatch && matchResult && matchResult.score > 0 && (
+          {showMatch && matchResult && (
             <MatchBubble result={matchResult} />
           )}
           <button
@@ -250,10 +276,10 @@ function JobDetailPanel({
       </div>
 
       {/* Match badge */}
-      {showMatch && matchResult && matchResult.score > 0 && (
+      {showMatch && matchResult && (
         <div className="mt-5 rounded-lg border bg-muted/50 p-4">
           <div className="flex items-center gap-3 mb-2">
-            <MatchBubble result={matchResult} />
+            <MatchBubble result={matchResult} size="lg" />
             <span className="text-sm font-semibold">Match Score</span>
           </div>
           <p className="text-sm text-muted-foreground leading-relaxed">
@@ -325,7 +351,7 @@ function JobDetailPanel({
 }
 
 export default function Jobs() {
-  const { jobs, totalJobs, currentPage, totalPages, loading, fetchJobs } =
+  const { jobs, totalJobs, currentPage, totalPages, loading, isDemo, fetchJobs } =
     useJobs();
   const { user } = useAuth();
   const { isJobSaved, toggleSaveJob } = useSaved();
@@ -389,6 +415,11 @@ export default function Jobs() {
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+      {isDemo && (
+        <div className="mb-4 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-2.5 text-sm text-yellow-800 dark:border-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300">
+          ⚠️ Could not reach the server — showing demo jobs.
+        </div>
+      )}
       {/* Header + Filters */}
       <ScrollReveal>
         <h1 className="text-3xl font-bold">Find Your Next Role</h1>

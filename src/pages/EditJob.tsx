@@ -40,7 +40,11 @@ export default function EditJob() {
       .then((j) => {
         setJob(j);
         setTitle(j.title || "");
-        setDescription(String(j.description) || "");
+        setDescription(
+          typeof j.description === "string"
+            ? j.description
+            : j.description?.text || "",
+        );
         setWebpageUrl(j.webpage_url || "");
         setCountry(j.country || "");
         setCity(j.city || "");
@@ -76,7 +80,7 @@ export default function EditJob() {
     e.preventDefault();
     setSaving(true);
     try {
-      await updateJob(+job.id, {
+      await updateJob(Number(job.id), {
         title,
         description,
         webpage_url: webpageUrl || undefined,
