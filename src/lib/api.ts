@@ -227,7 +227,10 @@ export const api = {
     );
     const user = data.jobseeker;
     localStorage.setItem(TOKEN_KEY, user.token);
-    localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: user.id, role: user.role, token: user.token }));
+    localStorage.setItem(
+      LOGIN_INFO_KEY,
+      JSON.stringify({ id: user.id, role: user.role, token: user.token }),
+    );
     return user;
   },
 
@@ -241,7 +244,10 @@ export const api = {
     );
     const user = data.companyRecruiter;
     localStorage.setItem(TOKEN_KEY, user.token);
-    localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: user.id, role: user.role, token: user.token }));
+    localStorage.setItem(
+      LOGIN_INFO_KEY,
+      JSON.stringify({ id: user.id, role: user.role, token: user.token }),
+    );
     return user;
   },
 
@@ -313,7 +319,14 @@ export const api = {
     const stored = this.getStoredUser();
     if (stored && stored.id === id) {
       const merged = { ...stored, ...updated };
-      localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: merged.id, role: merged.role, token: merged.token }));
+      localStorage.setItem(
+        LOGIN_INFO_KEY,
+        JSON.stringify({
+          id: merged.id,
+          role: merged.role,
+          token: merged.token,
+        }),
+      );
     }
     return updated;
   },
@@ -344,7 +357,14 @@ export const api = {
     const stored = this.getStoredUser();
     if (stored && stored.id === id) {
       const merged = { ...stored, ...updated };
-      localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: merged.id, role: merged.role, token: merged.token }));
+      localStorage.setItem(
+        LOGIN_INFO_KEY,
+        JSON.stringify({
+          id: merged.id,
+          role: merged.role,
+          token: merged.token,
+        }),
+      );
     }
     return updated;
   },
@@ -618,6 +638,22 @@ export const api = {
     ai: unknown;
   }> {
     return apiCall("/api_health");
+  },
+
+  // ── CV PDF Generation ────────────────────────
+  async generateCvPdf(jobseekerId: number): Promise<Blob> {
+    const response = await fetch(`${API_BASE}/generate-cv-pdf/${jobseekerId}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to generate CV PDF: ${response.statusText}`);
+    }
+
+    return response.blob();
   },
 };
 

@@ -7,8 +7,15 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useJobs } from "@/contexts/JobContext";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
@@ -26,8 +33,12 @@ export default function ManageJobs() {
     try {
       await deleteJob(id);
       toast.success("Job deleted");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to delete job");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        toast.error(err.message || "Failed to delete job");
+      } else {
+        toast.error("Failed to delete job");
+      }
     }
   };
 
@@ -35,9 +46,15 @@ export default function ManageJobs() {
     const newStatus = currentStatus === "ARCHIVED" ? "ACTIVE" : "ARCHIVED";
     try {
       await updateJobStatus(id, newStatus);
-      toast.success(`Job ${newStatus === "ARCHIVED" ? "archived" : "reactivated"}`);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update status");
+      toast.success(
+        `Job ${newStatus === "ARCHIVED" ? "archived" : "reactivated"}`,
+      );
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        toast.error(err.message || "Failed to update status");
+      } else {
+        toast.error("Failed to update status");
+      }
     }
   };
 
@@ -45,7 +62,9 @@ export default function ManageJobs() {
     return (
       <div className="mx-auto max-w-4xl px-4 py-20 text-center">
         <h1 className="text-2xl font-bold">Please log in</h1>
-        <Link to="/login"><Button className="mt-4">Log in</Button></Link>
+        <Link to="/login">
+          <Button className="mt-4">Log in</Button>
+        </Link>
       </div>
     );
   }
@@ -56,19 +75,31 @@ export default function ManageJobs() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">My Job Listings</h1>
-            <p className="mt-1 text-muted-foreground">Manage your posted jobs.</p>
+            <p className="mt-1 text-muted-foreground">
+              Manage your posted jobs.
+            </p>
           </div>
           <Link to="/create-job">
-            <Button className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90"><Plus className="h-4 w-4" /> New Job</Button>
+            <Button className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
+              <Plus className="h-4 w-4" /> New Job
+            </Button>
           </Link>
         </div>
       </ScrollReveal>
       <div className="mt-8 space-y-3">
-        {loading && <div className="py-16 text-center text-muted-foreground">Loading…</div>}
+        {loading && (
+          <div className="py-16 text-center text-muted-foreground">
+            Loading…
+          </div>
+        )}
         {!loading && jobs.length === 0 && (
           <div className="py-16 text-center text-muted-foreground">
             <p>You haven't posted any jobs yet.</p>
-            <Link to="/create-job"><Button variant="outline" className="mt-4 gap-2"><Plus className="h-4 w-4" /> Post your first job</Button></Link>
+            <Link to="/create-job">
+              <Button variant="outline" className="mt-4 gap-2">
+                <Plus className="h-4 w-4" /> Post your first job
+              </Button>
+            </Link>
           </div>
         )}
         {jobs.map((job, i) => (
@@ -81,42 +112,79 @@ export default function ManageJobs() {
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold truncate">{job.title}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {job.company?.companyName} · {[job.city, job.country].filter(Boolean).join(", ")}
+                    {job.company?.companyName} ·{" "}
+                    {[job.city, job.country].filter(Boolean).join(", ")}
                   </p>
                   <div className="flex gap-2 mt-1">
                     {job.status && (
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                        job.status === "ACTIVE" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"
-                      }`}>
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          job.status === "ACTIVE"
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
                         {job.status}
                       </span>
                     )}
-                    {job.category && <span className="text-xs text-muted-foreground">{job.category}</span>}
+                    {job.category && (
+                      <span className="text-xs text-muted-foreground">
+                        {job.category}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  <Link to={`/jobs/${job.id}`}><Button variant="ghost" size="icon" title="View"><Eye className="h-4 w-4" /></Button></Link>
-                  <Link to={`/edit-job/${job.id}`}><Button variant="ghost" size="icon" title="Edit"><Pencil className="h-4 w-4" /></Button></Link>
+                  <Link to={`/jobs/${job.id}`}>
+                    <Button variant="ghost" size="icon" title="View">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link to={`/edit-job/${job.id}`}>
+                    <Button variant="ghost" size="icon" title="Edit">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </Link>
                   <Button
                     variant="ghost"
                     size="icon"
                     title={job.status === "ARCHIVED" ? "Reactivate" : "Archive"}
-                    onClick={() => handleToggleStatus(Number(job.id), job.status)}
+                    onClick={() =>
+                      handleToggleStatus(Number(job.id), job.status)
+                    }
                   >
-                    {job.status === "ARCHIVED" ? <RotateCcw className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+                    {job.status === "ARCHIVED" ? (
+                      <RotateCcw className="h-4 w-4" />
+                    ) : (
+                      <Archive className="h-4 w-4" />
+                    )}
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" title="Delete" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Delete"
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Delete this job?</AlertDialogTitle>
-                        <AlertDialogDescription>This will permanently remove "{job.title}".</AlertDialogDescription>
+                        <AlertDialogDescription>
+                          This will permanently remove "{job.title}".
+                        </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDelete(Number(job.id))} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                        <AlertDialogAction
+                          onClick={() => handleDelete(Number(job.id))}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Delete
+                        </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>

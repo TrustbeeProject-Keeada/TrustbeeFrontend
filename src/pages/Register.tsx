@@ -72,8 +72,12 @@ export default function Register() {
         toast.success("Account created!");
         navigate("/manage-jobs");
       }
-    } catch (err: any) {
-      toast.error(err.message || "Registration failed");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        toast.error(err.message || "Registration failed");
+      } else {
+        toast.error("Registration failed");
+      }
     } finally {
       setLoading(false);
     }
