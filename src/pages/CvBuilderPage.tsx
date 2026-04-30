@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from "@/lib/api";
+import { api, type CvGenerationPayload } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import {
@@ -213,6 +213,87 @@ function generatePdf(data: CvData): string {
   return doc.output("datauristring");
 }
 
+function toCvGenerationPayload(
+  data: CvData,
+  options?: {
+    pendingSkill?: string;
+    pendingLanguage?: string;
+    currentStep?: StepKey;
+  },
+): CvGenerationPayload {
+  const pendingSkill = options?.pendingSkill?.trim() ?? "";
+  const pendingLanguage = options?.pendingLanguage?.trim() ?? "";
+
+  const skills = pendingSkill
+    ? Array.from(new Set([...data.skills, pendingSkill]))
+    : [...data.skills];
+
+  const languages = pendingLanguage
+    ? Array.from(new Set([...data.languages, pendingLanguage]))
+    : [...data.languages];
+
+  return {
+    personal: {
+      firstName: data.personal.firstName,
+      lastName: data.personal.lastName,
+      email: data.personal.email,
+      phone: data.personal.phone,
+      address: data.personal.address,
+      postalCode: data.personal.postalCode,
+      city: data.personal.city,
+      photo: data.personal.photo,
+    },
+    summary: data.summary,
+    experience: data.experience.map((entry) => ({
+      id: entry.id,
+      company: entry.company,
+      role: entry.role,
+      startDate: entry.startDate,
+      endDate: entry.endDate,
+      description: entry.description,
+    })),
+    education: data.education.map((entry) => ({
+      id: entry.id,
+      school: entry.school,
+      degree: entry.degree,
+      startDate: entry.startDate,
+      endDate: entry.endDate,
+      description: entry.description,
+    })),
+    skills,
+    languages,
+    interests: data.interests,
+    references: data.references,
+    pendingInputs: {
+      skill: pendingSkill || undefined,
+      language: pendingLanguage || undefined,
+    },
+    formSnapshot: {
+      personal: { ...data.personal },
+      summary: data.summary,
+      experience: data.experience.map((entry) => ({ ...entry })),
+      education: data.education.map((entry) => ({ ...entry })),
+      skills: [...data.skills],
+      languages: [...data.languages],
+      interests: data.interests,
+      references: data.references,
+    },
+    meta: {
+      source: "cv-builder",
+      submittedAt: new Date().toISOString(),
+      schemaVersion: 1,
+      currentStep: options?.currentStep,
+    },
+  };
+}
+
+function downloadDataUrl(dataUrl: string, fileName: string) {
+  const link = document.createElement("a");
+  link.href = dataUrl;
+  link.download = fileName;
+  link.click();
+}
+
 /* ── Main Page ──────────────────────────────────────── */
 export default function CvBuilderPage() {
   const [step, setStep] = useState<StepKey>("personal");
@@ -334,17 +415,27 @@ export default function CvBuilderPage() {
     setSaving(true);
     try {
       const base64 = generatePdf(data);
-      const link = document.createElement("a");
-      link.href = base64;
-      link.download =
+      const fileName =
         `${data.personal.firstName}_${data.personal.lastName}_CV.pdf`.replace(
           /\s+/g,
           "_",
         );
-      link.click();
+      downloadDataUrl(base64, fileName);
+
       if (user) {
-        await api.updateJobSeeker(user.id, { cv: base64 });
+        const payload = toCvGenerationPayload(data, {
+          pendingSkill: skillInput,
+          pendingLanguage: langInput,
+          currentStep: step,
+        });
+        try {
+          await api.generateCvPdf(user.id, payload);
+        } catch {
+          // Fallback while backend CV-form payload support is rolling out
+          await api.updateJobSeeker(user.id, { cv: base64 });
+        }
       }
+
       toast({
         title: "CV Created!",
         description: "Your CV has been generated and downloaded.",
@@ -371,20 +462,25 @@ export default function CvBuilderPage() {
     }
     setSaving(true);
     try {
-      const blob = await api.generateCvPdf(user.id);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download =
-        `${data.personal.firstName}_${data.personal.lastName}_CV.pdf`.replace(
+      const profile = await api.getJobSeeker(user.id);
+      if (!profile.cv) {
+        toast({
+          title: "No saved CV",
+          description: "Generate a CV first, then try downloading it.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const fileName =
+        `${data.personal.firstName || user.firstName || "my"}_${data.personal.lastName || user.lastName || "cv"}_CV.pdf`.replace(
           /\s+/g,
           "_",
         );
-      link.click();
-      window.URL.revokeObjectURL(url);
+      downloadDataUrl(profile.cv, fileName);
       toast({
         title: "CV Downloaded!",
-        description: "Your CV has been downloaded from the server.",
+        description: "Your saved CV has been downloaded.",
       });
     } catch {
       toast({

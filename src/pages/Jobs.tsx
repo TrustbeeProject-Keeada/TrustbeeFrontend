@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import {
   Search,
   MapPin,
@@ -20,16 +20,92 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
+import {
+  HoverCard,
+  HoverCardTrigger,
+  HoverCardContent,
+} from "@/components/ui/hover-card";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useJobs, type Job } from "@/contexts/JobContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSaved } from "@/contexts/SavedContext";
 import { toast } from "sonner";
-import { matchScoreDetailed, type MatchResult } from "@/lib/matchmaker";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-function MatchBubble({ result, size = "md" }: { result: MatchResult; size?: "sm" | "md" | "lg" }) {
+interface MatchResult {
+  score: number;
+  matchedKeywords: string[];
+  missingKeywords: string[];
+  locationMatch: boolean;
+  explanation: string;
+}
+
+function parseMatchmakeResponse(response: unknown): MatchResult | null {
+  if (!response || typeof response !== "object") return null;
+
+  const payload =
+    "data" in (response as Record<string, unknown>)
+      ? ((response as Record<string, unknown>).data as Record<string, unknown>)
+      : (response as Record<string, unknown>);
+
+  const scoreCandidate =
+    payload.score ??
+    payload.Score ??
+    payload.match ??
+    payload.percentage ??
+    payload.percent;
+
+  const parsedScore =
+    typeof scoreCandidate === "number"
+      ? Math.round(scoreCandidate)
+      : typeof scoreCandidate === "string"
+        ? Math.round(Number(scoreCandidate))
+        : NaN;
+
+  if (Number.isNaN(parsedScore)) return null;
+
+  const matchedKeywords = (
+    Array.isArray(payload.matchedKeywords)
+      ? payload.matchedKeywords
+      : Array.isArray(payload.Strengths)
+        ? payload.Strengths
+        : []
+  ) as string[];
+
+  const missingKeywords = (
+    Array.isArray(payload.missingKeywords)
+      ? payload.missingKeywords
+      : Array.isArray(payload.CriticalGaps)
+        ? payload.CriticalGaps
+        : Array.isArray(payload.WeaknessesGaps)
+          ? payload.WeaknessesGaps
+          : []
+  ) as string[];
+
+  const explanation =
+    (payload.explanation as string) ||
+    (payload.Explanation as string) ||
+    (payload.finalRecommendation as string) ||
+    (payload.FinalRecommendation as string) ||
+    "No explanation provided by the AI.";
+
+  return {
+    score: Math.max(0, Math.min(100, parsedScore)),
+    matchedKeywords,
+    missingKeywords,
+    locationMatch: Boolean(payload.locationMatch),
+    explanation,
+  };
+}
+
+function MatchBubble({
+  result,
+  size = "md",
+}: {
+  result: MatchResult;
+  size?: "sm" | "md" | "lg";
+}) {
   const { score } = result;
 
   const colorClasses =
@@ -79,7 +155,11 @@ function MatchBubble({ result, size = "md" }: { result: MatchResult; size?: "sm"
             <div
               className={cn(
                 "h-full rounded-full transition-all",
-                score >= 70 ? "bg-green-500" : score >= 40 ? "bg-yellow-500" : "bg-muted-foreground/50",
+                score >= 70
+                  ? "bg-green-500"
+                  : score >= 40
+                    ? "bg-yellow-500"
+                    : "bg-muted-foreground/50",
               )}
               style={{ width: `${score}%` }}
             />
@@ -91,7 +171,9 @@ function MatchBubble({ result, size = "md" }: { result: MatchResult; size?: "sm"
 
           {result.matchedKeywords.length > 0 && (
             <div className="mt-3">
-              <span className="text-xs font-medium text-foreground">Matching Skills</span>
+              <span className="text-xs font-medium text-foreground">
+                Matching Skills
+              </span>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {result.matchedKeywords.map((kw) => (
                   <span
@@ -107,7 +189,9 @@ function MatchBubble({ result, size = "md" }: { result: MatchResult; size?: "sm"
 
           {result.missingKeywords.length > 0 && (
             <div className="mt-3">
-              <span className="text-xs font-medium text-foreground">Consider Adding</span>
+              <span className="text-xs font-medium text-foreground">
+                Consider Adding
+              </span>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {result.missingKeywords.map((kw) => (
                   <span
@@ -180,7 +264,7 @@ function JobCard({
           )}
         </div>
         <div className="flex flex-col items-center gap-1.5 shrink-0">
-          {showMatch && matchResult && (
+          {isSelected && showMatch && matchResult && (
             <MatchBubble result={matchResult} />
           )}
           <button
@@ -209,6 +293,7 @@ function JobDetailPanel({
   isSaved,
   matchResult,
   showMatch,
+  matchLoading,
   onSave,
   onClose,
 }: {
@@ -216,6 +301,7 @@ function JobDetailPanel({
   isSaved: boolean;
   matchResult: MatchResult | null;
   showMatch: boolean;
+  matchLoading: boolean;
   onSave: () => void;
   onClose: () => void;
 }) {
@@ -276,7 +362,13 @@ function JobDetailPanel({
       </div>
 
       {/* Match badge */}
-      {showMatch && matchResult && (
+      {showMatch && matchLoading && (
+        <div className="mt-5 rounded-lg border bg-muted/50 p-4 text-sm text-muted-foreground">
+          Calculating your AI match score…
+        </div>
+      )}
+
+      {showMatch && !matchLoading && matchResult && (
         <div className="mt-5 rounded-lg border bg-muted/50 p-4">
           <div className="flex items-center gap-3 mb-2">
             <MatchBubble result={matchResult} size="lg" />
@@ -351,8 +443,15 @@ function JobDetailPanel({
 }
 
 export default function Jobs() {
-  const { jobs, totalJobs, currentPage, totalPages, loading, isDemo, fetchJobs } =
-    useJobs();
+  const {
+    jobs,
+    totalJobs,
+    currentPage,
+    totalPages,
+    loading,
+    isDemo,
+    fetchJobs,
+  } = useJobs();
   const { user } = useAuth();
   const { isJobSaved, toggleSaveJob } = useSaved();
   const [search, setSearch] = useState("");
@@ -360,6 +459,9 @@ export default function Jobs() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [selectedMatchResult, setSelectedMatchResult] =
+    useState<MatchResult | null>(null);
+  const [matchLoading, setMatchLoading] = useState(false);
 
   useEffect(() => {
     fetchJobs({
@@ -378,27 +480,43 @@ export default function Jobs() {
     }
   }, [jobs, selectedJob]);
 
-  const showMatch = user?.role === "JOB_SEEKER";
+  const showMatch = !!user && user.role === "JOB_SEEKER";
 
-  // Pre-compute match results for all visible jobs
-  const matchResults = useMemo(() => {
-    if (!showMatch || !user) return new Map<string | number, MatchResult>();
-    const map = new Map<string | number, MatchResult>();
-    for (const job of jobs) {
-      // For matchScoreDetailed, convert ID to number if it's a string
-      const numericId =
-        typeof job.id === "string" ? parseInt(job.id, 10) : job.id;
-      if (!isNaN(numericId)) {
-        map.set(job.id, matchScoreDetailed(user, job));
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchSelectedMatch = async () => {
+      if (!showMatch || !selectedJob || !user) {
+        setSelectedMatchResult(null);
+        return;
       }
-    }
-    return map;
-  }, [jobs, user, showMatch]);
 
-  const selectedMatchResult =
-    selectedJob && showMatch
-      ? (matchResults.get(selectedJob.id) ?? null)
-      : null;
+      const numericJobId = Number(selectedJob.id);
+      if (Number.isNaN(numericJobId)) {
+        setSelectedMatchResult(null);
+        return;
+      }
+
+      setMatchLoading(true);
+      try {
+        const response = await api.matchmake(numericJobId, user.id);
+        if (cancelled) return;
+
+        const parsed = parseMatchmakeResponse(response);
+        setSelectedMatchResult(parsed);
+      } catch {
+        if (cancelled) return;
+        setSelectedMatchResult(null);
+      } finally {
+        if (!cancelled) setMatchLoading(false);
+      }
+    };
+
+    fetchSelectedMatch();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedJob, showMatch, user]);
 
   const handleSave = async (jobId: number | string) => {
     if (!user) {
@@ -490,7 +608,10 @@ export default function Jobs() {
           Loading jobs…
         </div>
       ) : (
-        <div className="mt-6 flex gap-6" style={{ minHeight: "calc(100vh - 260px)" }}>
+        <div
+          className="mt-6 flex gap-6"
+          style={{ minHeight: "calc(100vh - 260px)" }}
+        >
           {/* Left: Job list */}
           <div className="w-full lg:w-[420px] shrink-0 space-y-2 overflow-y-auto lg:max-h-[calc(100vh-260px)] pr-1 scrollbar-thin">
             {jobs.map((job) => (
@@ -500,7 +621,9 @@ export default function Jobs() {
                 isSelected={selectedJob?.id === job.id}
                 isSaved={isJobSaved(job.id)}
                 showMatch={!!showMatch}
-                matchResult={matchResults.get(job.id) ?? null}
+                matchResult={
+                  selectedJob?.id === job.id ? selectedMatchResult : null
+                }
                 onSelect={() => setSelectedJob(job)}
                 onSave={() => handleSave(job.id)}
               />
@@ -545,6 +668,7 @@ export default function Jobs() {
                 isSaved={isJobSaved(selectedJob.id)}
                 matchResult={selectedMatchResult}
                 showMatch={!!showMatch}
+                matchLoading={matchLoading}
                 onSave={() => handleSave(selectedJob.id)}
                 onClose={() => setSelectedJob(null)}
               />
@@ -566,6 +690,7 @@ export default function Jobs() {
               isSaved={isJobSaved(selectedJob.id)}
               matchResult={selectedMatchResult}
               showMatch={!!showMatch}
+              matchLoading={matchLoading}
               onSave={() => handleSave(selectedJob.id)}
               onClose={() => setSelectedJob(null)}
             />

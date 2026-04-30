@@ -25,8 +25,25 @@ const DEFAULT_DEMO_SEEKER: User = {
   country: "Sweden",
   city: "Stockholm",
   bio: "Experienced full-stack developer with 5 years of experience in React, TypeScript, Node.js, and cloud infrastructure. Passionate about building scalable web applications and user-centered design.",
-  personalStatement: "I am a motivated software engineer looking for challenging opportunities in frontend and full-stack development. I have experience with agile methodologies, CI/CD pipelines, and modern JavaScript frameworks.",
-  skills: ["React", "TypeScript", "JavaScript", "Node.js", "Python", "SQL", "PostgreSQL", "AWS", "Docker", "Git", "Agile", "REST API", "GraphQL", "CSS", "Tailwind"],
+  personalStatement:
+    "I am a motivated software engineer looking for challenging opportunities in frontend and full-stack development. I have experience with agile methodologies, CI/CD pipelines, and modern JavaScript frameworks.",
+  skills: [
+    "React",
+    "TypeScript",
+    "JavaScript",
+    "Node.js",
+    "Python",
+    "SQL",
+    "PostgreSQL",
+    "AWS",
+    "Docker",
+    "Git",
+    "Agile",
+    "REST API",
+    "GraphQL",
+    "CSS",
+    "Tailwind",
+  ],
   languages: ["English", "Swedish"],
   cv: "",
   portfolioLink: "https://demo-portfolio.trustbee.com",
@@ -77,7 +94,7 @@ interface AuthContextType {
     password: string;
     cv?: string;
     personalStatement?: string;
-  }) => Promise<void>;
+  }) => Promise<User>;
   registerCompanyRecruiter: (data: {
     email: string;
     password: string;
@@ -86,7 +103,7 @@ interface AuthContextType {
     phoneNumber: string;
     description?: string;
     logoUrl?: string;
-  }) => Promise<void>;
+  }) => Promise<User>;
   logout: () => void;
   updateProfile: (data: Record<string, unknown>) => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -100,8 +117,8 @@ const AuthContext = createContext<AuthContextType>({
   isEmployer: false,
   isOffline: false,
   login: async () => {},
-  registerJobSeeker: async () => {},
-  registerCompanyRecruiter: async () => {},
+  registerJobSeeker: async () => DEFAULT_DEMO_SEEKER,
+  registerCompanyRecruiter: async () => DEFAULT_DEMO_RECRUITER,
   logout: () => {},
   updateProfile: async () => {},
   refreshProfile: async () => {},
@@ -169,15 +186,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearOfflineUser();
       } catch (err) {
         // If backend is unreachable (network error), offer demo mode
-        const isNetworkError = err instanceof TypeError && err.message.includes("fetch");
+        const isNetworkError =
+          err instanceof TypeError && err.message.includes("fetch");
         if (isNetworkError) {
-          const demoUser = role === "COMPANY_RECRUITER"
-            ? { ...DEFAULT_DEMO_RECRUITER, email }
-            : { ...DEFAULT_DEMO_SEEKER, email };
+          const demoUser =
+            role === "COMPANY_RECRUITER"
+              ? { ...DEFAULT_DEMO_RECRUITER, email }
+              : { ...DEFAULT_DEMO_SEEKER, email };
           setUser(demoUser);
           saveOfflineUser(demoUser);
           setIsOffline(true);
-          toast.info("Backend unavailable — signed in with demo/offline mode.", { duration: 5000 });
+          toast.info(
+            "Backend unavailable — signed in with demo/offline mode.",
+            { duration: 5000 },
+          );
           return;
         }
         throw err;
@@ -200,21 +222,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const loggedIn = await api.loginJobSeeker(data.email, data.password);
         setUser(loggedIn);
         setIsOffline(false);
+        return loggedIn;
       } catch (err) {
-        const isNetworkError = err instanceof TypeError && err.message.includes("fetch");
+        const isNetworkError =
+          err instanceof TypeError && err.message.includes("fetch");
         if (isNetworkError) {
           const demoUser: User = {
             ...DEFAULT_DEMO_SEEKER,
             email: data.email,
             firstName: data.firstName,
             lastName: data.lastName,
-            personalStatement: data.personalStatement || DEFAULT_DEMO_SEEKER.personalStatement,
+            personalStatement:
+              data.personalStatement || DEFAULT_DEMO_SEEKER.personalStatement,
           };
           setUser(demoUser);
           saveOfflineUser(demoUser);
           setIsOffline(true);
-          toast.info("Backend unavailable — registered in demo/offline mode.", { duration: 5000 });
-          return;
+          toast.info("Backend unavailable — registered in demo/offline mode.", {
+            duration: 5000,
+          });
+          return demoUser;
         }
         throw err;
       }
@@ -234,11 +261,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }) => {
       try {
         await api.registerCompanyRecruiter(data);
-        const loggedIn = await api.loginCompanyRecruiter(data.email, data.password);
+        const loggedIn = await api.loginCompanyRecruiter(
+          data.email,
+          data.password,
+        );
         setUser(loggedIn);
         setIsOffline(false);
+        return loggedIn;
       } catch (err) {
-        const isNetworkError = err instanceof TypeError && err.message.includes("fetch");
+        const isNetworkError =
+          err instanceof TypeError && err.message.includes("fetch");
         if (isNetworkError) {
           const demoUser: User = {
             ...DEFAULT_DEMO_RECRUITER,
@@ -251,8 +283,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(demoUser);
           saveOfflineUser(demoUser);
           setIsOffline(true);
-          toast.info("Backend unavailable — registered in demo/offline mode.", { duration: 5000 });
-          return;
+          toast.info("Backend unavailable — registered in demo/offline mode.", {
+            duration: 5000,
+          });
+          return demoUser;
         }
         throw err;
       }
@@ -315,7 +349,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         // Save offline
         saveOfflineUser(merged);
-        toast.info("Changes saved locally. They'll sync when the server is available.");
+        toast.info(
+          "Changes saved locally. They'll sync when the server is available.",
+        );
       }
     },
     [user, isOffline],
