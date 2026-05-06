@@ -3,13 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/lib/api";
@@ -35,12 +29,8 @@ export default function Login() {
       await login(email, password, role);
       toast.success("Welcome back!");
       navigate("/dashboard");
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        toast.error(err.message || "Login failed");
-      } else {
-        toast.error("Login failed");
-      }
+    } catch (err: any) {
+      toast.error(err.message || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -51,78 +41,39 @@ export default function Login() {
       <ScrollReveal>
         <div className="glass w-full max-w-md rounded-2xl p-8">
           <div className="mb-6 text-center">
-            <img
-              src={logo}
-              alt="TrustBee"
-              className="mx-auto mb-4 h-14 w-14 rounded-xl"
-            />
+            <img src={logo} alt="TrustBee" className="mx-auto mb-4 h-14 w-14 rounded-xl" />
             <h1 className="text-2xl font-bold">Welcome back</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Sign in to your TrustBee account
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Sign in to your TrustBee account</p>
           </div>
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <Label>I am a</Label>
-              <Select
-                value={role}
-                onValueChange={(v) => setRole(v as UserRole)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="JOB_SEEKER">Job Seeker</SelectItem>
-                  <SelectItem value="COMPANY_RECRUITER">
-                    Company / Recruiter
-                  </SelectItem>
+                  <SelectItem value="COMPANY_RECRUITER">Company / Recruiter</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+              <Input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                <Link
-                  to="/reset-password"
-                  className="text-xs text-accent hover:underline"
-                >
-                  Forgot password?
-                </Link>
+                <Link to="/reset-password" className="text-xs text-accent hover:underline">Forgot password?</Link>
               </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-primary hover:bg-primary/90 active:scale-[0.97] transition-transform"
-            >
+            <Button type="submit" disabled={loading} className="w-full bg-primary hover:bg-primary/90 active:scale-[0.97] transition-transform">
               {loading ? "Signing in…" : "Sign in"}
             </Button>
           </form>
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Don't have an account?{" "}
-            <Link
-              to="/register"
-              className="font-medium text-accent hover:underline"
-            >
-              Sign up
-            </Link>
+            <Link to="/register" className="font-medium text-accent hover:underline">Sign up</Link>
           </p>
         </div>
       </ScrollReveal>

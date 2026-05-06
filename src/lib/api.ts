@@ -160,97 +160,6 @@ export interface RegisterRequest {
 
 export type UpdateProfileRequest = Record<string, unknown>;
 
-export interface CvGenerationPayload {
-  personal: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone?: string;
-    address?: string;
-    postalCode?: string;
-    city?: string;
-    photo?: string | null;
-  };
-  summary?: string;
-  experience?: Array<{
-    id?: string;
-    company: string;
-    role: string;
-    startDate: string;
-    endDate: string;
-    description?: string;
-  }>;
-  education?: Array<{
-    id?: string;
-    school: string;
-    degree: string;
-    startDate: string;
-    endDate: string;
-    description?: string;
-  }>;
-  skills?: string[];
-  languages?: string[];
-  interests?: string;
-  references?: string;
-  pendingInputs?: {
-    skill?: string;
-    language?: string;
-  };
-  formSnapshot?: {
-    personal: {
-      firstName: string;
-      lastName: string;
-      email: string;
-      phone: string;
-      address: string;
-      postalCode: string;
-      city: string;
-      photo: string | null;
-    };
-    summary: string;
-    experience: Array<{
-      id: string;
-      company: string;
-      role: string;
-      startDate: string;
-      endDate: string;
-      description: string;
-    }>;
-    education: Array<{
-      id: string;
-      school: string;
-      degree: string;
-      startDate: string;
-      endDate: string;
-      description: string;
-    }>;
-    skills: string[];
-    languages: string[];
-    interests: string;
-    references: string;
-  };
-  meta?: {
-    source: "cv-builder";
-    submittedAt: string;
-    schemaVersion: number;
-    currentStep?: string;
-  };
-}
-
-type ApiEnvelope<T> = T | { data: T };
-
-function unwrapData<T>(value: ApiEnvelope<T>): T {
-  if (
-    typeof value === "object" &&
-    value !== null &&
-    "data" in value &&
-    (value as { data: T }).data !== undefined
-  ) {
-    return (value as { data: T }).data;
-  }
-  return value as T;
-}
-
 // ━━━ Storage keys ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const TOKEN_KEY = "trustbee_token";
 // Minimal login info stored temporarily to bootstrap the session
@@ -318,10 +227,7 @@ export const api = {
     );
     const user = data.jobseeker;
     localStorage.setItem(TOKEN_KEY, user.token);
-    localStorage.setItem(
-      LOGIN_INFO_KEY,
-      JSON.stringify({ id: user.id, role: user.role, token: user.token }),
-    );
+    localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: user.id, role: user.role, token: user.token }));
     return user;
   },
 
@@ -335,10 +241,7 @@ export const api = {
     );
     const user = data.companyRecruiter;
     localStorage.setItem(TOKEN_KEY, user.token);
-    localStorage.setItem(
-      LOGIN_INFO_KEY,
-      JSON.stringify({ id: user.id, role: user.role, token: user.token }),
-    );
+    localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: user.id, role: user.role, token: user.token }));
     return user;
   },
 
@@ -407,16 +310,10 @@ export const api = {
     );
     const updated = res.jobseeker;
     // Update cached user
-    const stored = this.getStoredLoginInfo();
+    const stored = this.getStoredUser();
     if (stored && stored.id === id) {
-      localStorage.setItem(
-        LOGIN_INFO_KEY,
-        JSON.stringify({
-          id,
-          role: stored.role,
-          token: stored.token,
-        }),
-      );
+      const merged = { ...stored, ...updated };
+      localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: merged.id, role: merged.role, token: merged.token }));
     }
     return updated;
   },
@@ -444,16 +341,10 @@ export const api = {
       },
     );
     const updated = res.data;
-    const stored = this.getStoredLoginInfo();
+    const stored = this.getStoredUser();
     if (stored && stored.id === id) {
-      localStorage.setItem(
-        LOGIN_INFO_KEY,
-        JSON.stringify({
-          id,
-          role: stored.role,
-          token: stored.token,
-        }),
-      );
+      const merged = { ...stored, ...updated };
+      localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: merged.id, role: merged.role, token: merged.token }));
     }
     return updated;
   },
@@ -604,7 +495,7 @@ export const api = {
   // ── Applications ─────────────────────────────
   async applyToJob(jobId: number | string): Promise<Application> {
     const res = await apiCall<{ status: string; data: Application }>(
-      `/applications/job/${jobId}`,
+      `/jobs/job_bank/${jobId}`,
       {
         method: "POST",
       },
@@ -614,7 +505,7 @@ export const api = {
 
   async getJobApplications(jobId: number): Promise<Application[]> {
     const res = await apiCall<{ status: string; data: Application[] }>(
-      `/applications/job/${jobId}`,
+      `/jobs/job_bank/${jobId}`,
     );
     return res.data;
   },
@@ -710,11 +601,14 @@ export const api = {
   },
 
   // ── AI / Matchmaking ─────────────────────────
-  async matchmake(jobAddId: number, jobseekerId: number): Promise<unknown> {
-    const res = await apiCall<{ status: string; data: unknown }>("/matchmake", {
-      method: "POST",
-      body: JSON.stringify({ jobAddId, jobseekerId }),
-    });
+  async matchmake(jobAddId: number, jobseekerId: number): Promise<unknown[]> {
+    const res = await apiCall<{ status: string; data: unknown[] }>(
+      "/matchmake",
+      {
+        method: "POST",
+        body: JSON.stringify({ jobAddId, jobseekerId }),
+      },
+    );
     return res.data;
   },
 
@@ -724,56 +618,6 @@ export const api = {
     ai: unknown;
   }> {
     return apiCall("/api_health");
-  },
-
-  // ── CV Generation ────────────────────────────
-  async generateCv(
-    jobseekerId: number,
-    formData?: CvGenerationPayload,
-  ): Promise<{
-    success: boolean;
-    jobSeekerId: number;
-    cv: string;
-    generatedAt: string;
-  }> {
-    const res = await apiCall<
-      ApiEnvelope<{
-        success: boolean;
-        jobSeekerId: number;
-        cv: string;
-        generatedAt: string;
-      }>
-    >(`/generate-cv/${jobseekerId}`, {
-      method: "POST",
-      body: JSON.stringify(formData ?? {}),
-    });
-    return unwrapData(res);
-  },
-
-  async generateCvPdf(
-    jobseekerId: number,
-    formData?: CvGenerationPayload,
-  ): Promise<{
-    success: boolean;
-    jobSeekerId: number;
-    savedAt?: string;
-    pdfSizeBytes?: number;
-    message?: string;
-  }> {
-    const res = await apiCall<
-      ApiEnvelope<{
-        success: boolean;
-        jobSeekerId: number;
-        savedAt?: string;
-        pdfSizeBytes?: number;
-        message?: string;
-      }>
-    >(`/generate-cv-pdf/${jobseekerId}`, {
-      method: "POST",
-      body: JSON.stringify(formData ?? {}),
-    });
-
-    return unwrapData(res);
   },
 };
 

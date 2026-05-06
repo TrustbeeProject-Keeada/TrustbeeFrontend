@@ -3,22 +3,10 @@ import { Send, Search, MessageSquare, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollReveal } from "@/components/ScrollReveal";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, type Message as ApiMessage } from "@/lib/api";
@@ -44,9 +32,7 @@ export default function Messages() {
   // New conversation state
   const [newConvoOpen, setNewConvoOpen] = useState(false);
   const [receiverId, setReceiverId] = useState("");
-  const [receiverRole, setReceiverRole] = useState<
-    "JOB_SEEKER" | "COMPANY_RECRUITER"
-  >("JOB_SEEKER");
+  const [receiverRole, setReceiverRole] = useState<"JOB_SEEKER" | "COMPANY_RECRUITER">("JOB_SEEKER");
   const [newMessage, setNewMessage] = useState("");
   const { toast } = useToast();
 
@@ -54,23 +40,18 @@ export default function Messages() {
   useEffect(() => {
     if (!user) return;
     setLoadingConvos(true);
-    api
-      .getReceivedMessages()
+    api.getReceivedMessages()
       .then((msgs) => {
         // Group messages into conversations by sender
         const convMap = new Map<string, ConversationSummary>();
         msgs.forEach((m) => {
-          const otherId =
-            m.senderJobSeekerId && m.senderJobSeekerId !== user.id
-              ? m.senderJobSeekerId
-              : m.senderRecruiterId && m.senderRecruiterId !== user.id
-                ? m.senderRecruiterId
-                : null;
+          const otherId = m.senderJobSeekerId && m.senderJobSeekerId !== user.id
+            ? m.senderJobSeekerId
+            : m.senderRecruiterId && m.senderRecruiterId !== user.id
+            ? m.senderRecruiterId
+            : null;
           if (!otherId) return;
-          const otherRole =
-            m.senderJobSeekerId === otherId
-              ? "JOB_SEEKER"
-              : "COMPANY_RECRUITER";
+          const otherRole = m.senderJobSeekerId === otherId ? "JOB_SEEKER" : "COMPANY_RECRUITER";
           const key = `${otherId}-${otherRole}`;
           if (!convMap.has(key)) {
             convMap.set(key, {
@@ -103,69 +84,51 @@ export default function Messages() {
 
   const handleSend = async () => {
     if (!input.trim() || !selected || !user) return;
+    if (!Number.isInteger(selected.otherId) || selected.otherId <= 0) {
+      toast({ title: "Invalid recipient", description: "This conversation has an invalid receiver ID.", variant: "destructive" });
+      return;
+    }
     setSending(true);
     try {
-      const msg = await api.sendMessage(
-        input,
-        selected.otherId,
-        selected.otherRole,
-      );
+      const msg = await api.sendMessage(input, selected.otherId, selected.otherRole);
       setMessages((prev) => [...prev, msg]);
       setConversations((prev) =>
         prev.map((c) =>
           c.otherId === selected.otherId && c.otherRole === selected.otherRole
             ? { ...c, lastMsg: input, time: "Just now" }
-            : c,
-        ),
+            : c
+        )
       );
       setInput("");
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        toast({
-          title: "Error",
-          description: err.message || "Failed to send message",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to send message",
-          variant: "destructive",
-        });
-      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to send message", variant: "destructive" });
     } finally {
       setSending(false);
     }
   };
 
   const handleCreateConversation = async () => {
-    if (!receiverId.trim()) {
-      toast({
-        title: "Missing info",
-        description: "Please enter a receiver ID.",
-        variant: "destructive",
-      });
+    const trimmedId = receiverId.trim();
+    const idNum = Number(trimmedId);
+    if (!trimmedId || !Number.isInteger(idNum) || idNum <= 0) {
+      toast({ title: "Invalid receiver ID", description: "Please enter a valid positive numeric user ID.", variant: "destructive" });
+      return;
+    }
+    if (user && idNum === user.id && receiverRole === user.role) {
+      toast({ title: "Invalid receiver", description: "You can't send a message to yourself.", variant: "destructive" });
       return;
     }
     if (!newMessage.trim()) {
-      toast({
-        title: "Missing info",
-        description: "Please enter a message.",
-        variant: "destructive",
-      });
+      toast({ title: "Missing info", description: "Please enter a message.", variant: "destructive" });
       return;
     }
 
     try {
-      const msg = await api.sendMessage(
-        newMessage,
-        Number(receiverId),
-        receiverRole,
-      );
+      const msg = await api.sendMessage(newMessage, idNum, receiverRole);
       const newConvo: ConversationSummary = {
-        otherId: Number(receiverId),
+        otherId: idNum,
         otherRole: receiverRole,
-        otherName: `User #${receiverId}`,
+        otherName: `User #${idNum}`,
         lastMsg: newMessage,
         time: "Just now",
       };
@@ -175,26 +138,13 @@ export default function Messages() {
       setReceiverId("");
       setNewMessage("");
       setNewConvoOpen(false);
-      toast({
-        title: "Conversation created",
-        description: `Started conversation with User #${receiverId}`,
-      });
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        toast({
-          title: "Error",
-          description: err.message || "Failed to create conversation",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to create conversation",
-          variant: "destructive",
-        });
-      }
+      toast({ title: "Conversation created", description: `Started conversation with User #${idNum}` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to create conversation", variant: "destructive" });
     }
   };
+
+  const handleSendValidated = handleSend;
 
   const isMine = (m: ApiMessage) => {
     if (!user) return false;
@@ -219,11 +169,7 @@ export default function Messages() {
               </div>
               <Dialog open={newConvoOpen} onOpenChange={setNewConvoOpen}>
                 <DialogTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="h-9 w-9 shrink-0"
-                  >
+                  <Button size="icon" variant="outline" className="h-9 w-9 shrink-0">
                     <Plus className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>
@@ -243,22 +189,11 @@ export default function Messages() {
                     </div>
                     <div className="space-y-1.5">
                       <Label>Receiver Role *</Label>
-                      <Select
-                        value={receiverRole}
-                        onValueChange={(v) =>
-                          setReceiverRole(
-                            v as "JOB_SEEKER" | "COMPANY_RECRUITER",
-                          )
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
+                      <Select value={receiverRole} onValueChange={(v) => setReceiverRole(v as "JOB_SEEKER" | "COMPANY_RECRUITER")}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="JOB_SEEKER">Job Seeker</SelectItem>
-                          <SelectItem value="COMPANY_RECRUITER">
-                            Company Recruiter
-                          </SelectItem>
+                          <SelectItem value="COMPANY_RECRUITER">Company Recruiter</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -271,10 +206,7 @@ export default function Messages() {
                         rows={3}
                       />
                     </div>
-                    <Button
-                      onClick={handleCreateConversation}
-                      className="w-full"
-                    >
+                    <Button onClick={handleCreateConversation} className="w-full">
                       <Plus className="mr-2 h-4 w-4" /> Start Conversation
                     </Button>
                   </div>
@@ -283,18 +215,12 @@ export default function Messages() {
             </div>
             <div className="flex-1 overflow-y-auto">
               {loadingConvos ? (
-                <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                  Loading…
-                </div>
+                <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Loading…</div>
               ) : conversations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full p-6 text-center">
                   <MessageSquare className="h-10 w-10 text-muted-foreground/40 mb-3" />
-                  <p className="text-sm text-muted-foreground">
-                    No conversations yet
-                  </p>
-                  <p className="text-xs text-muted-foreground/60 mt-1">
-                    Click + to start a conversation
-                  </p>
+                  <p className="text-sm text-muted-foreground">No conversations yet</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Click + to start a conversation</p>
                 </div>
               ) : (
                 conversations.map((c) => (
@@ -302,21 +228,14 @@ export default function Messages() {
                     key={`${c.otherId}-${c.otherRole}`}
                     onClick={() => handleSelectConversation(c)}
                     className={`w-full text-left px-4 py-3 border-b border-border/50 transition-colors hover:bg-muted/50 ${
-                      selected?.otherId === c.otherId &&
-                      selected?.otherRole === c.otherRole
-                        ? "bg-muted/70"
-                        : ""
+                      selected?.otherId === c.otherId && selected?.otherRole === c.otherRole ? "bg-muted/70" : ""
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-sm">{c.otherName}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {c.time}
-                      </span>
+                      <span className="text-xs text-muted-foreground">{c.time}</span>
                     </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground truncate">
-                      {c.lastMsg}
-                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground truncate">{c.lastMsg}</p>
                   </button>
                 ))
               )}
@@ -328,35 +247,20 @@ export default function Messages() {
             {selected ? (
               <>
                 <div className="border-b border-border px-4 py-3">
-                  <h3 className="font-semibold text-sm">
-                    {selected.otherName}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {selected.otherRole === "JOB_SEEKER"
-                      ? "Job Seeker"
-                      : "Company Recruiter"}
-                  </p>
+                  <h3 className="font-semibold text-sm">{selected.otherName}</h3>
+                  <p className="text-xs text-muted-foreground">{selected.otherRole === "JOB_SEEKER" ? "Job Seeker" : "Company Recruiter"}</p>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                   {loadingMsgs ? (
-                    <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                      Loading messages…
-                    </div>
+                    <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Loading messages…</div>
                   ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center">
-                      <p className="text-sm text-muted-foreground">
-                        No messages yet
-                      </p>
-                      <p className="text-xs text-muted-foreground/60 mt-1">
-                        Send a message to start the conversation
-                      </p>
+                      <p className="text-sm text-muted-foreground">No messages yet</p>
+                      <p className="text-xs text-muted-foreground/60 mt-1">Send a message to start the conversation</p>
                     </div>
                   ) : (
                     messages.map((m) => (
-                      <div
-                        key={m.id}
-                        className={`flex ${isMine(m) ? "justify-end" : "justify-start"}`}
-                      >
+                      <div key={m.id} className={`flex ${isMine(m) ? "justify-end" : "justify-start"}`}>
                         <div
                           className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm ${
                             isMine(m)
@@ -365,9 +269,7 @@ export default function Messages() {
                           }`}
                         >
                           <p>{m.content}</p>
-                          <span
-                            className={`mt-1 block text-[10px] ${isMine(m) ? "text-primary-foreground/60" : "text-muted-foreground"}`}
-                          >
+                          <span className={`mt-1 block text-[10px] ${isMine(m) ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
                             {new Date(m.createdAt).toLocaleString()}
                           </span>
                         </div>
@@ -397,9 +299,7 @@ export default function Messages() {
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center text-center p-6">
                 <MessageSquare className="h-12 w-12 text-muted-foreground/30 mb-4" />
-                <p className="text-muted-foreground">
-                  Select a conversation to start messaging
-                </p>
+                <p className="text-muted-foreground">Select a conversation to start messaging</p>
               </div>
             )}
           </div>
