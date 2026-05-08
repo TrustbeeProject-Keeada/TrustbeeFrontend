@@ -9,7 +9,6 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import jsPDF from "jspdf";
 import {
   User, Briefcase, PenTool, ChevronUp, ChevronDown, Settings,
   Plus, Trash2, Camera, ChevronRight, ChevronLeft, Loader2, GraduationCap,
@@ -148,48 +147,6 @@ function Section({
   );
 }
 
-/* ── PDF generator ──────────────────────────────────── */
-function generatePdf(data: CvData): string {
-  const doc = new jsPDF();
-  const w = doc.internal.pageSize.getWidth();
-  let y = 20;
-
-  const checkPage = () => { if (y > 270) { doc.addPage(); y = 20; } };
-  const addSection = (title: string, content: string) => {
-    if (!content.trim()) return;
-    checkPage();
-    doc.setFontSize(13); doc.setFont("helvetica", "bold");
-    doc.text(title, 14, y); y += 2;
-    doc.setDrawColor(180); doc.line(14, y, w - 14, y); y += 6;
-    doc.setFontSize(10); doc.setFont("helvetica", "normal");
-    const lines = doc.splitTextToSize(content, w - 28);
-    for (const l of lines) { checkPage(); doc.text(l, 14, y); y += 5; }
-    y += 4;
-  };
-
-  const fullName = `${data.personal.firstName} ${data.personal.lastName}`.trim() || "Your Name";
-  doc.setFontSize(22); doc.setFont("helvetica", "bold");
-  doc.text(fullName, w / 2, y, { align: "center" }); y += 8;
-  doc.setFontSize(10); doc.setFont("helvetica", "normal");
-  const contact = [data.personal.email, data.personal.phone, data.personal.city].filter(Boolean).join("  •  ");
-  doc.text(contact, w / 2, y, { align: "center" }); y += 10;
-  doc.setDrawColor(60); doc.setLineWidth(0.5); doc.line(14, y, w - 14, y); y += 8;
-
-  addSection("Professional Summary", data.summary);
-  for (const exp of data.experience) {
-    addSection(exp.company ? `${exp.role} — ${exp.company}` : exp.role, `${exp.startDate} – ${exp.endDate}\n${exp.description}`);
-  }
-  for (const edu of data.education) {
-    addSection(edu.school ? `${edu.degree} — ${edu.school}` : edu.degree, `${edu.startDate} – ${edu.endDate}\n${edu.description}`);
-  }
-  if (data.skills.length) addSection("Skills", data.skills.join(", "));
-  if (data.languages.length) addSection("Languages", data.languages.join(", "));
-  addSection("Interests", data.interests);
-  addSection("References", data.references);
-
-  return doc.output("datauristring");
-}
-
 /* ── Main Page ──────────────────────────────────────── */
 export default function CvBuilderPage() {
   const [step, setStep] = useState<StepKey>("personal");
@@ -285,28 +242,21 @@ export default function CvBuilderPage() {
       toast({ title: "Missing info", description: "Please fill in at least your first name and email.", variant: "destructive" });
       return;
     }
+    if (!data.skills.length) {
+      toast({ title: "Missing info", description: "Please add at least one skill.", variant: "destructive" });
+      return;
+    }
     setSaving(true);
-    let pdfOk = false;
     try {
-      const base64 = generatePdf(data);
+      const jobseekerId = user?.id ?? 0;
+      const { pdfBase64 } = await api.generateCvPdf(jobseekerId, { formSnapshot: data });
       const link = document.createElement("a");
-      link.href = base64;
-      link.download = `${data.personal.firstName}_${data.personal.lastName}_CV.pdf`.replace(/\s+/g, "_");
+      link.href = pdfBase64;
+      link.download = `CV_${Date.now()}.pdf`;
       link.click();
-      pdfOk = true;
-      if (user) {
-        try {
-          await api.updateJobSeeker(user.id, { cv: base64 });
-        } catch {
-          // Backend save failed — PDF already downloaded, keep local copy
-          try { localStorage.setItem("trustbee_cv_pdf", base64); } catch {}
-        }
-      }
-      toast({ title: "CV Created!", description: "Your CV has been generated and downloaded." });
-    } catch {
-      if (!pdfOk) {
-        toast({ title: "Error", description: "Failed to generate CV.", variant: "destructive" });
-      }
+      toast({ title: "CV Created!", description: "Your AI-generated CV has been downloaded." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.message || "Failed to generate CV.", variant: "destructive" });
     } finally {
       setSaving(false);
     }

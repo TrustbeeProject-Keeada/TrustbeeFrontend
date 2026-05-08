@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Search,
   MapPin,
@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ExternalLink,
   X,
+  Loader2,
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -25,9 +26,32 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import { useJobs, type Job } from "@/contexts/JobContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSaved } from "@/contexts/SavedContext";
+import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { matchScoreDetailed, type MatchResult } from "@/lib/matchmaker";
 import { cn } from "@/lib/utils";
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+interface AiMatchResult {
+  score: number;
+  explanation: string;
+  strengths: string[];
+  gaps: string[];
+  recommendation: string;
+  criticalGaps: string[];
+}
 
 function MatchBubble({ result, size = "md" }: { result: MatchResult; size?: "sm" | "md" | "lg" }) {
   const { score } = result;
@@ -180,7 +204,7 @@ function JobCard({
           )}
         </div>
         <div className="flex flex-col items-center gap-1.5 shrink-0">
-          {showMatch && matchResult && (
+          {showMatch && isSelected && matchResult && (
             <MatchBubble result={matchResult} />
           )}
           <button
@@ -207,18 +231,25 @@ function JobCard({
 function JobDetailPanel({
   job,
   isSaved,
-  matchResult,
   showMatch,
+  aiMatch,
+  aiMatchLoading,
   onSave,
   onClose,
 }: {
   job: Job;
   isSaved: boolean;
-  matchResult: MatchResult | null;
   showMatch: boolean;
+  aiMatch: AiMatchResult | null;
+  aiMatchLoading: boolean;
   onSave: () => void;
   onClose: () => void;
 }) {
+  const scoreColor =
+    !aiMatch ? "" :
+    aiMatch.score >= 70 ? "text-green-600" :
+    aiMatch.score >= 45 ? "text-yellow-600" : "text-red-500";
+
   return (
     <div className="h-full overflow-y-auto rounded-lg border bg-card p-6">
       {/* Header */}
@@ -275,27 +306,57 @@ function JobDetailPanel({
         </Button>
       </div>
 
-      {/* Match badge */}
-      {showMatch && matchResult && (
-        <div className="mt-5 rounded-lg border bg-muted/50 p-4">
-          <div className="flex items-center gap-3 mb-2">
-            <MatchBubble result={matchResult} size="lg" />
-            <span className="text-sm font-semibold">Match Score</span>
-          </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {matchResult.explanation}
-          </p>
-          {matchResult.matchedKeywords.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {matchResult.matchedKeywords.map((kw) => (
-                <span
-                  key={kw}
-                  className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
-                >
-                  {kw}
-                </span>
-              ))}
+      {/* AI Match section */}
+      {showMatch && (
+        <div className="mt-4 rounded-lg border bg-muted/40 p-3">
+          {aiMatchLoading ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Analysing your fit…
             </div>
+          ) : aiMatch ? (
+            <div className="space-y-2">
+              {/* Score row */}
+              <div className="flex items-center gap-2">
+                <span className={cn("text-xl font-bold tabular-nums", scoreColor)}>
+                  {aiMatch.score}%
+                </span>
+                <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all",
+                      aiMatch.score >= 70 ? "bg-green-500" :
+                      aiMatch.score >= 45 ? "bg-yellow-500" : "bg-red-400",
+                    )}
+                    style={{ width: `${aiMatch.score}%` }}
+                  />
+                </div>
+                {aiMatch.recommendation && (
+                  <span className="text-xs text-muted-foreground shrink-0">{aiMatch.recommendation}</span>
+                )}
+              </div>
+              {/* Explanation */}
+              <p className="text-xs text-muted-foreground leading-relaxed">{aiMatch.explanation}</p>
+              {/* Strengths + Gaps inline */}
+              {(aiMatch.strengths.length > 0 || aiMatch.gaps.length > 0) && (
+                <div className="flex flex-wrap gap-1">
+                  {aiMatch.strengths.map((s) => (
+                    <span key={s} className="rounded bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:text-green-400">✓ {s}</span>
+                  ))}
+                  {aiMatch.gaps.map((g) => (
+                    <span key={g} className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">{g}</span>
+                  ))}
+                </div>
+              )}
+              {/* Critical gaps */}
+              {aiMatch.criticalGaps.filter(Boolean).length > 0 && (
+                <p className="text-[10px] text-destructive">
+                  ⚠ {aiMatch.criticalGaps.filter(Boolean).join(" · ")}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Upload a CV to get your AI match score.</p>
           )}
         </div>
       )}
@@ -339,11 +400,13 @@ function JobDetailPanel({
           Full Job Description
         </h3>
         <div className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-          {typeof job.description === "string"
-            ? job.description
-            : (job.description as Record<string, string>)?.text_formatted ||
-              (job.description as Record<string, string>)?.text ||
-              "No description available"}
+          {stripHtml(
+            typeof job.description === "string"
+              ? job.description
+              : (job.description as Record<string, string>)?.text ||
+                (job.description as Record<string, string>)?.text_formatted ||
+                ""
+          ) || "No description available"}
         </div>
       </div>
     </div>
@@ -361,6 +424,9 @@ export default function Jobs() {
   const [page, setPage] = useState(1);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [aiMatch, setAiMatch] = useState<AiMatchResult | null>(null);
+  const [aiMatchLoading, setAiMatchLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     fetchJobs({
@@ -384,6 +450,40 @@ export default function Jobs() {
     setMobileDetailOpen(false);
   }, [search, countryFilter, categoryFilter, page]);
 
+  // Fetch AI match score when job is selected
+  useEffect(() => {
+    if (abortRef.current) abortRef.current.abort();
+    if (!selectedJob || user?.role !== "JOB_SEEKER") {
+      setAiMatch(null);
+      setAiMatchLoading(false);
+      return;
+    }
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setAiMatch(null);
+    setAiMatchLoading(true);
+    api.matchmake(selectedJob.id, user.id)
+      .then((res) => {
+        if (ctrl.signal.aborted) return;
+        const d = (res as any) ?? {};
+        setAiMatch({
+          score: typeof d.Score === "number" ? d.Score : 0,
+          explanation: d.Explanation || "",
+          strengths: Array.isArray(d.Strengths) ? d.Strengths.filter(Boolean) : [],
+          gaps: Array.isArray(d.WeaknessesGaps) ? d.WeaknessesGaps.filter(Boolean) : [],
+          recommendation: d.FinalRecommendation || "",
+          criticalGaps: Array.isArray(d.CriticalGaps) ? d.CriticalGaps.filter(Boolean) : [],
+        });
+      })
+      .catch(() => {
+        if (!ctrl.signal.aborted) setAiMatch(null);
+      })
+      .finally(() => {
+        if (!ctrl.signal.aborted) setAiMatchLoading(false);
+      });
+    return () => ctrl.abort();
+  }, [selectedJob?.id, user?.id, user?.role]);
+
   const showMatch = user?.role === "JOB_SEEKER";
 
   // Pre-compute match results for all visible jobs
@@ -400,11 +500,6 @@ export default function Jobs() {
     }
     return map;
   }, [jobs, user, showMatch]);
-
-  const selectedMatchResult =
-    selectedJob && showMatch
-      ? (matchResults.get(selectedJob.id) ?? null)
-      : null;
 
   const handleSave = async (jobId: number | string) => {
     if (!user) {
@@ -552,8 +647,9 @@ export default function Jobs() {
               <JobDetailPanel
                 job={selectedJob}
                 isSaved={isJobSaved(selectedJob.id)}
-                matchResult={selectedMatchResult}
                 showMatch={!!showMatch}
+                aiMatch={aiMatch}
+                aiMatchLoading={aiMatchLoading}
                 onSave={() => handleSave(selectedJob.id)}
                 onClose={() => setSelectedJob(null)}
               />
@@ -573,8 +669,9 @@ export default function Jobs() {
             <JobDetailPanel
               job={selectedJob}
               isSaved={isJobSaved(selectedJob.id)}
-              matchResult={selectedMatchResult}
               showMatch={!!showMatch}
+              aiMatch={aiMatch}
+              aiMatchLoading={aiMatchLoading}
               onSave={() => handleSave(selectedJob.id)}
               onClose={() => setMobileDetailOpen(false)}
             />

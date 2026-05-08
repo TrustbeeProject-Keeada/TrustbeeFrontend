@@ -95,7 +95,7 @@ export default function ManageJobs() {
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  <Link to={`/jobs/${job.id}`}><Button variant="ghost" size="icon" title="View"><Eye className="h-4 w-4" /></Button></Link>
+                  <Link to={`/jobs/${job.id}?source=trustbee`}><Button variant="ghost" size="icon" title="View"><Eye className="h-4 w-4" /></Button></Link>
                   <Link to={`/edit-job/${job.id}`}><Button variant="ghost" size="icon" title="Edit"><Pencil className="h-4 w-4" /></Button></Link>
                   <Button
                     variant="ghost"

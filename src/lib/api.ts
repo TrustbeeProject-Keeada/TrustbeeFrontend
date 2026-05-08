@@ -30,7 +30,7 @@ export interface User {
   skills?: string[];
   // Company recruiter fields
   companyName?: string;
-  organizationNumber?: number;
+  organizationNumber?: string;
   description?: string;
   logoUrl?: string;
   industry?: string;
@@ -126,6 +126,7 @@ export interface RegisterJobSeekerRequest {
   lastName: string;
   email: string;
   password: string;
+  phoneNumber?: string;
   cv?: string;
   personalStatement?: string;
 }
@@ -134,7 +135,7 @@ export interface RegisterCompanyRequest {
   email: string;
   password: string;
   companyName: string;
-  organizationNumber: number;
+  organizationNumber: string;
   phoneNumber: string;
   description?: string;
   logoUrl?: string;
@@ -143,19 +144,6 @@ export interface RegisterCompanyRequest {
 export interface LoginRequest {
   email: string;
   password: string;
-}
-
-export interface RegisterRequest {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  country: string;
-  city: string;
-  role: UserRole;
-  password: string;
-  companyName?: string;
-  orgNumber?: string;
 }
 
 export type UpdateProfileRequest = Record<string, unknown>;
@@ -227,7 +215,10 @@ export const api = {
     );
     const user = data.jobseeker;
     localStorage.setItem(TOKEN_KEY, user.token);
-    localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: user.id, role: user.role, token: user.token }));
+    localStorage.setItem(
+      LOGIN_INFO_KEY,
+      JSON.stringify({ id: user.id, role: user.role, token: user.token }),
+    );
     return user;
   },
 
@@ -241,7 +232,10 @@ export const api = {
     );
     const user = data.companyRecruiter;
     localStorage.setItem(TOKEN_KEY, user.token);
-    localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: user.id, role: user.role, token: user.token }));
+    localStorage.setItem(
+      LOGIN_INFO_KEY,
+      JSON.stringify({ id: user.id, role: user.role, token: user.token }),
+    );
     return user;
   },
 
@@ -308,14 +302,7 @@ export const api = {
         body: JSON.stringify(data),
       },
     );
-    const updated = res.jobseeker;
-    // Update cached user
-    const stored = this.getStoredUser();
-    if (stored && stored.id === id) {
-      const merged = { ...stored, ...updated };
-      localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: merged.id, role: merged.role, token: merged.token }));
-    }
-    return updated;
+    return res.jobseeker;
   },
 
   async deleteJobSeeker(id: number): Promise<void> {
@@ -340,13 +327,7 @@ export const api = {
         body: JSON.stringify(data),
       },
     );
-    const updated = res.data;
-    const stored = this.getStoredUser();
-    if (stored && stored.id === id) {
-      const merged = { ...stored, ...updated };
-      localStorage.setItem(LOGIN_INFO_KEY, JSON.stringify({ id: merged.id, role: merged.role, token: merged.token }));
-    }
-    return updated;
+    return res.data;
   },
 
   async deleteCompanyRecruiter(id: number): Promise<void> {
@@ -372,7 +353,17 @@ export const api = {
     }
     const qs = query.toString();
 
-    // Fetch from both TrustBee jobs and job bank
+    // When filtering by company, only fetch from the TrustBee DB — a recruiter's
+    // own jobs cannot exist in the external job bank.
+    if (params?.companyId) {
+      const res = await apiCall<JobsResponse>(`/jobs${qs ? `?${qs}` : ""}`);
+      return {
+        jobs: res.jobs.map((job) => ({ ...job, source: "trustbee" as const })),
+        meta: res.meta,
+      };
+    }
+
+    // For public job browsing, merge TrustBee DB jobs with external job bank jobs.
     const [trustbeeRes, jobBankRes] = await Promise.all([
       apiCall<JobsResponse>(`/jobs${qs ? `?${qs}` : ""}`),
       apiCall<{
@@ -384,13 +375,8 @@ export const api = {
       })),
     ]);
 
-    // Extract totalJobs value (handle both number and { value: number } formats)
-    const trustbeeTotalJobs =
-      typeof trustbeeRes.meta.totalJobs === "object"
-        ? (trustbeeRes.meta.totalJobs as Record<string, number>).value
-        : (trustbeeRes.meta.totalJobs as number);
+    const trustbeeTotalJobs = trustbeeRes.meta.totalJobs as number;
 
-    // Tag jobs with their source
     const trustbeeJobs = trustbeeRes.jobs.map((job) => ({
       ...job,
       source: "trustbee" as const,
@@ -400,11 +386,8 @@ export const api = {
       source: "job_bank" as const,
     }));
 
-    // Combine jobs from both sources
-    const allJobs = [...trustbeeJobs, ...bankJobs];
-
     return {
-      jobs: allJobs,
+      jobs: [...trustbeeJobs, ...bankJobs],
       meta: {
         totalJobs: trustbeeTotalJobs + jobBankRes.meta.totalJobs,
         currentPage: trustbeeRes.meta.currentPage,
@@ -417,9 +400,11 @@ export const api = {
     id: number | string,
     source?: "trustbee" | "job_bank",
   ): Promise<Job> {
-    // Use explicit source if provided, otherwise detect based on ID type
+    // Numeric IDs (including numeric strings like "42") belong to the TrustBee DB.
+    // Non-numeric strings are job bank UUIDs/slugs.
+    const isNumericId = !isNaN(Number(id)) && String(id).trim() !== "";
     const endpoint =
-      source === "job_bank" || (typeof id === "string" && source !== "trustbee")
+      source === "job_bank" || (!isNumericId && source !== "trustbee")
         ? `/jobs/job_bank/${id}`
         : `/jobs/${id}`;
 
@@ -474,28 +459,10 @@ export const api = {
     return res.data;
   },
 
-  async getJobBank(params?: {
-    search?: string;
-    page?: number;
-    limit?: number;
-  }): Promise<{
-    total: number;
-    hits: JobBankHit[];
-  }> {
-    const query = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== "") query.set(k, String(v));
-      });
-    }
-    const qs = query.toString();
-    return apiCall(`/jobs/job_bank${qs ? `?${qs}` : ""}`);
-  },
-
   // ── Applications ─────────────────────────────
   async applyToJob(jobId: number | string): Promise<Application> {
     const res = await apiCall<{ status: string; data: Application }>(
-      `/jobs/job_bank/${jobId}`,
+      `/applications/job/${jobId}`,
       {
         method: "POST",
       },
@@ -505,7 +472,7 @@ export const api = {
 
   async getJobApplications(jobId: number): Promise<Application[]> {
     const res = await apiCall<{ status: string; data: Application[] }>(
-      `/jobs/job_bank/${jobId}`,
+      `/applications/job/${jobId}`,
     );
     return res.data;
   },
@@ -601,12 +568,12 @@ export const api = {
   },
 
   // ── AI / Matchmaking ─────────────────────────
-  async matchmake(jobAddId: number, jobseekerId: number): Promise<unknown[]> {
-    const res = await apiCall<{ status: string; data: unknown[] }>(
+  async matchmake(jobAddId: number | string, jobseekerId: number): Promise<unknown> {
+    const res = await apiCall<{ status: string; data: unknown }>(
       "/matchmake",
       {
         method: "POST",
-        body: JSON.stringify({ jobAddId, jobseekerId }),
+        body: JSON.stringify({ jobAddId: Number(jobAddId), jobseekerId }),
       },
     );
     return res.data;
@@ -619,16 +586,19 @@ export const api = {
   }> {
     return apiCall("/api_health");
   },
-};
 
-// ━━━ Backward compat — keep `db` export for CvBuilder ━━━
-export const db = {
-  uploadGeneratedCv(
-    userId: number,
-    base64Pdf: string,
-    _fileName: string,
-  ): void {
-    // For CV, we update the jobseeker's cv field
-    api.updateJobSeeker(userId, { cv: base64Pdf }).catch(() => {});
+  async generateCvPdf(
+    jobseekerId: number,
+    body: Record<string, unknown>,
+  ): Promise<{ pdfBase64: string; pdfSizeBytes: number; generatedAt: string }> {
+    const res = await apiCall<{
+      status: string;
+      data: { pdfBase64: string; pdfSizeBytes: number; generatedAt: string };
+    }>(`/generate-cv-pdf/${jobseekerId}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return res.data;
   },
 };
+

@@ -13,6 +13,11 @@ import {
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import {
+  isValidEmail,
+  validatePassword,
+  getPasswordErrorMessage,
+} from "@/lib/validation";
 import logo from "@/assets/trustbee-logo.png";
 
 type RoleChoice = "JOB_SEEKER" | "COMPANY_RECRUITER";
@@ -26,6 +31,7 @@ export default function Register() {
   // Job seeker fields
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [jobSeekerPhone, setJobSeekerPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -36,11 +42,41 @@ export default function Register() {
   const [description, setDescription] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [emailError, setEmailError] = useState("");
+
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    if (value) {
+      const validation = validatePassword(value);
+      setPasswordError(getPasswordErrorMessage(validation));
+    } else {
+      setPasswordError("");
+    }
+  };
+
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+    if (value && !isValidEmail(value)) {
+      setEmailError("Please enter a valid email address");
+    } else {
+      setEmailError("");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      toast.error("Please fill in email and password");
+
+    // Validate email
+    if (!email || !isValidEmail(email)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    // Validate password
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      toast.error(getPasswordErrorMessage(passwordValidation));
       return;
     }
 
@@ -52,7 +88,13 @@ export default function Register() {
           setLoading(false);
           return;
         }
-        await registerJobSeeker({ firstName, lastName, email, password });
+        await registerJobSeeker({
+          firstName,
+          lastName,
+          email,
+          password,
+          phoneNumber: jobSeekerPhone || undefined,
+        });
         toast.success("Account created!");
         navigate("/dashboard");
       } else {
@@ -65,15 +107,17 @@ export default function Register() {
           email,
           password,
           companyName,
-          organizationNumber: Number(organizationNumber),
+          organizationNumber,
           phoneNumber,
           description: description || undefined,
         });
         toast.success("Account created!");
         navigate("/manage-jobs");
       }
-    } catch (err: any) {
-      toast.error(err.message || "Registration failed");
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Registration failed";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -134,6 +178,16 @@ export default function Register() {
                       onChange={(e) => setLastName(e.target.value)}
                     />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="jobSeekerPhone">Phone number</Label>
+                  <Input
+                    id="jobSeekerPhone"
+                    type="tel"
+                    placeholder="+46 70 123 4567"
+                    value={jobSeekerPhone}
+                    onChange={(e) => setJobSeekerPhone(e.target.value)}
+                  />
                 </div>
               </>
             ) : (
