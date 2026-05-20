@@ -3,39 +3,24 @@ import { api, type Job } from "@/lib/api";
 
 export type { Job };
 
-/* ── Demo jobs shown when API is unreachable ────────── */
-const demoCompany = { id: 0, companyName: "TrustBee Demo", email: "demo@trustbee.com", description: "Demo company" };
+// Demo jobs — only used in development when the backend is unreachable
+const DEV_DEMO_COMPANY = { id: 0, companyName: "TrustBee Demo", email: "demo@trustbee.com", description: "Demo company" };
 
-const DEMO_JOBS: Job[] = [
+const DEV_DEMO_JOBS: Job[] = [
   {
-    id: 1, title: "Frontend Developer", description: "Build beautiful UIs with React and TypeScript. Join our growing team and work on exciting projects.",
-    country: "Sweden", city: "Stockholm", category: "IT", status: "ACTIVE", company: demoCompany,
+    id: 1, title: "Frontend Developer", description: "Build beautiful UIs with React and TypeScript.",
+    country: "Sweden", city: "Stockholm", category: "IT", status: "ACTIVE", company: DEV_DEMO_COMPANY,
     employmentType: "Full-time", expiresAt: "2026-12-31",
   },
   {
-    id: 2, title: "Backend Engineer", description: "Design and maintain scalable APIs using Node.js and PostgreSQL. Remote-friendly position.",
-    country: "Sweden", city: "Gothenburg", category: "IT", status: "ACTIVE", company: { ...demoCompany, companyName: "Nordic Tech AB" },
+    id: 2, title: "Backend Engineer", description: "Design and maintain scalable APIs using Node.js and PostgreSQL.",
+    country: "Sweden", city: "Gothenburg", category: "IT", status: "ACTIVE", company: { ...DEV_DEMO_COMPANY, companyName: "Nordic Tech AB" },
     employmentType: "Full-time", expiresAt: "2026-11-30",
   },
   {
-    id: 3, title: "UX Designer", description: "Create user-centered designs for web and mobile apps. Collaborate with product and engineering teams.",
-    country: "Sweden", city: "Malmö", category: "Design", status: "ACTIVE", company: { ...demoCompany, companyName: "DesignCo" },
+    id: 3, title: "UX Designer", description: "Create user-centered designs for web and mobile apps.",
+    country: "Sweden", city: "Malmö", category: "Design", status: "ACTIVE", company: { ...DEV_DEMO_COMPANY, companyName: "DesignCo" },
     employmentType: "Full-time", expiresAt: "2026-10-15",
-  },
-  {
-    id: 4, title: "Data Analyst", description: "Analyze business data and provide actionable insights. SQL and Python experience preferred.",
-    country: "Sweden", city: "Stockholm", category: "Data", status: "ACTIVE", company: { ...demoCompany, companyName: "DataWorks" },
-    employmentType: "Part-time", expiresAt: "2026-09-30",
-  },
-  {
-    id: 5, title: "Project Manager", description: "Lead cross-functional teams and deliver projects on time. Agile/Scrum experience is a plus.",
-    country: "Sweden", city: "Uppsala", category: "Management", status: "ACTIVE", company: { ...demoCompany, companyName: "BuildRight" },
-    employmentType: "Full-time", expiresAt: "2026-12-01",
-  },
-  {
-    id: 6, title: "DevOps Engineer", description: "Manage CI/CD pipelines and cloud infrastructure on AWS. Kubernetes experience required.",
-    country: "Norway", city: "Oslo", category: "IT", status: "ACTIVE", company: { ...demoCompany, companyName: "CloudNine" },
-    employmentType: "Full-time", expiresAt: "2026-11-15",
   },
 ];
 
@@ -45,7 +30,7 @@ interface JobContextType {
   currentPage: number;
   totalPages: number;
   loading: boolean;
-  isDemo: boolean;
+  error: string | null;
   fetchJobs: (params?: {
     search?: string;
     status?: string;
@@ -77,7 +62,7 @@ const JobContext = createContext<JobContextType>({
   currentPage: 1,
   totalPages: 1,
   loading: false,
-  isDemo: false,
+  error: null,
   fetchJobs: async () => {},
   getJob: async () => ({} as Job),
   createJob: async () => ({} as Job),
@@ -92,24 +77,31 @@ export function JobProvider({ children }: { children: ReactNode }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [isDemo, setIsDemo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchJobs = useCallback(async (params?: Parameters<typeof api.getJobs>[0]) => {
     setLoading(true);
+    setError(null);
     try {
       const res = await api.getJobs(params);
       setJobs(res.jobs);
       setTotalJobs(res.meta.totalJobs);
       setCurrentPage(res.meta.currentPage);
       setTotalPages(res.meta.totalPages);
-      setIsDemo(false);
     } catch (err) {
-      console.error("Failed to fetch jobs, using demo data:", err);
-      setJobs(DEMO_JOBS);
-      setTotalJobs(DEMO_JOBS.length);
-      setCurrentPage(1);
-      setTotalPages(1);
-      setIsDemo(true);
+      if (import.meta.env.DEV && err instanceof TypeError && (err as TypeError).message.includes("fetch")) {
+        // Dev only: show demo jobs when backend is unreachable
+        setJobs(DEV_DEMO_JOBS);
+        setTotalJobs(DEV_DEMO_JOBS.length);
+        setCurrentPage(1);
+        setTotalPages(1);
+        setError("[Dev] Backend unreachable — showing demo jobs.");
+      } else {
+        const msg = err instanceof Error ? err.message : "Failed to load jobs.";
+        setError(msg);
+        setJobs([]);
+        setTotalJobs(0);
+      }
     } finally {
       setLoading(false);
     }
@@ -118,10 +110,12 @@ export function JobProvider({ children }: { children: ReactNode }) {
   const getJob = useCallback(async (id: number) => {
     try {
       return await api.getJob(id);
-    } catch {
-      const demo = DEMO_JOBS.find((j) => j.id === id);
-      if (demo) return demo;
-      throw new Error("Job not found");
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        const demo = DEV_DEMO_JOBS.find((j) => j.id === id);
+        if (demo) return demo;
+      }
+      throw err;
     }
   }, []);
 
@@ -147,7 +141,7 @@ export function JobProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <JobContext.Provider value={{ jobs, totalJobs, currentPage, totalPages, loading, isDemo, fetchJobs, getJob, createJob, updateJob, deleteJob, updateJobStatus }}>
+    <JobContext.Provider value={{ jobs, totalJobs, currentPage, totalPages, loading, error, fetchJobs, getJob, createJob, updateJob, deleteJob, updateJobStatus }}>
       {children}
     </JobContext.Provider>
   );

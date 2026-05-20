@@ -6,54 +6,34 @@ import {
   useEffect,
   ReactNode,
 } from "react";
-import { api, type User, type UserRole } from "@/lib/api";
+import { api, type User, type UserRole, ApiError, setUnauthorizedHandler } from "@/lib/api";
 import { toast } from "sonner";
 
 export type { User, UserRole };
 
-// ── Demo user for offline/testing mode ──────────
-const OFFLINE_USER_KEY = "trustbee_offline_user";
-
-const DEFAULT_DEMO_SEEKER: User = {
+// ── Demo fallback (development only) ────────────
+const DEV_DEMO_SEEKER: User = {
   id: 999,
   email: "demo@trustbee.com",
   role: "JOB_SEEKER",
-  token: "offline-demo-token",
   firstName: "Demo",
   lastName: "User",
   phoneNumber: "+46 70 000 0000",
   country: "Sweden",
   city: "Stockholm",
-  bio: "Experienced full-stack developer with 5 years of experience in React, TypeScript, Node.js, and cloud infrastructure. Passionate about building scalable web applications and user-centered design.",
+  bio: "Experienced full-stack developer with 5 years of experience in React, TypeScript, Node.js, and cloud infrastructure.",
   personalStatement:
-    "I am a motivated software engineer looking for challenging opportunities in frontend and full-stack development. I have experience with agile methodologies, CI/CD pipelines, and modern JavaScript frameworks.",
-  skills: [
-    "React",
-    "TypeScript",
-    "JavaScript",
-    "Node.js",
-    "Python",
-    "SQL",
-    "PostgreSQL",
-    "AWS",
-    "Docker",
-    "Git",
-    "Agile",
-    "REST API",
-    "GraphQL",
-    "CSS",
-    "Tailwind",
-  ],
+    "I am a motivated software engineer looking for challenging opportunities in frontend and full-stack development.",
+  skills: ["React", "TypeScript", "Node.js", "PostgreSQL", "Docker"],
   languages: ["English", "Swedish"],
   cv: "",
   portfolioLink: "https://demo-portfolio.trustbee.com",
 };
 
-const DEFAULT_DEMO_RECRUITER: User = {
+const DEV_DEMO_RECRUITER: User = {
   id: 998,
   email: "recruiter@trustbee.com",
   role: "COMPANY_RECRUITER",
-  token: "offline-demo-token",
   companyName: "TrustBee Demo Corp",
   organizationNumber: "5500001234",
   phoneNumber: "+46 70 000 0001",
@@ -63,29 +43,11 @@ const DEFAULT_DEMO_RECRUITER: User = {
   city: "Stockholm",
 };
 
-function getOfflineUser(): User | null {
-  try {
-    const raw = localStorage.getItem(OFFLINE_USER_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveOfflineUser(user: User) {
-  localStorage.setItem(OFFLINE_USER_KEY, JSON.stringify(user));
-}
-
-function clearOfflineUser() {
-  localStorage.removeItem(OFFLINE_USER_KEY);
-}
-
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAuthenticated: boolean;
   isEmployer: boolean;
-  isOffline: boolean;
   login: (email: string, password: string, role: UserRole) => Promise<void>;
   registerJobSeeker: (data: {
     firstName: string;
@@ -115,7 +77,6 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   isAuthenticated: false,
   isEmployer: false,
-  isOffline: false,
   login: async () => {},
   registerJobSeeker: async () => {},
   registerCompanyRecruiter: async () => {},
@@ -128,48 +89,51 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isOffline, setIsOffline] = useState(false);
 
-  // On mount: try to restore session from API, else from offline cache
+  // Register the global 401 handler so any expired-cookie response immediately
+  // clears the user — ProtectedRoute then redirects to /login automatically.
   useEffect(() => {
-    const info = api.getStoredLoginInfo();
-    if (!info) {
-      // Check if there's an offline user
-      const offlineUser = getOfflineUser();
-      if (offlineUser) {
-        setUser(offlineUser);
-        setIsOffline(true);
-      }
+    setUnauthorizedHandler(() => {
+      api.clearSession();
+      setUser(null);
+    });
+  }, []);
+
+  // On mount: restore session using the stored session hint + cookie
+  useEffect(() => {
+    const hint = api.getSessionHint();
+    if (!hint) {
       setLoading(false);
       return;
     }
-    const fetchProfile = async () => {
+
+    const restoreSession = async () => {
       try {
         let freshUser: User;
-        if (info.role === "COMPANY_RECRUITER") {
-          const res = await api.getCompanyRecruiter(info.id);
+        if (hint.role === "COMPANY_RECRUITER") {
+          const res = await api.getCompanyRecruiter(hint.id);
           freshUser = res.data;
         } else {
-          freshUser = await api.getJobSeeker(info.id);
+          freshUser = await api.getJobSeeker(hint.id);
         }
-        const merged = { ...freshUser, token: info.token, role: info.role };
-        setUser(merged);
-        setIsOffline(false);
-      } catch {
-        // Backend unreachable — try offline user
-        const offlineUser = getOfflineUser();
-        if (offlineUser) {
-          setUser(offlineUser);
-          setIsOffline(true);
+        setUser({ ...freshUser, role: hint.role });
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          // Cookie expired or invalid — clear session
+          api.clearSession();
+        } else if (import.meta.env.DEV) {
+          // Dev only: show a notice but don't block the user
+          toast.warning("Backend unreachable — session could not be restored.");
         } else {
-          api.logout();
-          setUser(null);
+          toast.error("Could not restore your session. Please log in again.");
+          api.clearSession();
         }
       } finally {
         setLoading(false);
       }
     };
-    fetchProfile();
+
+    restoreSession();
   }, []);
 
   const login = useCallback(
@@ -182,24 +146,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           loggedIn = await api.loginJobSeeker(email, password);
         }
         setUser(loggedIn);
-        setIsOffline(false);
-        clearOfflineUser();
       } catch (err) {
-        // If backend is unreachable (network error), offer demo mode
-        const isNetworkError =
-          err instanceof TypeError && err.message.includes("fetch");
-        if (isNetworkError) {
+        if (
+          import.meta.env.DEV &&
+          err instanceof TypeError &&
+          err.message.includes("fetch")
+        ) {
+          // Dev only: fall back to a demo user when the backend is unreachable
           const demoUser =
             role === "COMPANY_RECRUITER"
-              ? { ...DEFAULT_DEMO_RECRUITER, email }
-              : { ...DEFAULT_DEMO_SEEKER, email };
+              ? { ...DEV_DEMO_RECRUITER, email }
+              : { ...DEV_DEMO_SEEKER, email };
           setUser(demoUser);
-          saveOfflineUser(demoUser);
-          setIsOffline(true);
-          toast.info(
-            "Backend unavailable — signed in with demo/offline mode.",
-            { duration: 5000 },
-          );
+          toast.info("[Dev] Backend unreachable — using demo mode.", {
+            duration: 5000,
+          });
           return;
         }
         throw err;
@@ -217,33 +178,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cv?: string;
       personalStatement?: string;
     }) => {
-      try {
-        await api.registerJobSeeker(data);
-        const loggedIn = await api.loginJobSeeker(data.email, data.password);
-        setUser(loggedIn);
-        setIsOffline(false);
-      } catch (err) {
-        const isNetworkError =
-          err instanceof TypeError && err.message.includes("fetch");
-        if (isNetworkError) {
-          const demoUser: User = {
-            ...DEFAULT_DEMO_SEEKER,
-            email: data.email,
-            firstName: data.firstName,
-            lastName: data.lastName,
-            personalStatement:
-              data.personalStatement || DEFAULT_DEMO_SEEKER.personalStatement,
-          };
-          setUser(demoUser);
-          saveOfflineUser(demoUser);
-          setIsOffline(true);
-          toast.info("Backend unavailable — registered in demo/offline mode.", {
-            duration: 5000,
-          });
+      if (
+        import.meta.env.DEV
+      ) {
+        try {
+          await api.registerJobSeeker(data);
+          const loggedIn = await api.loginJobSeeker(data.email, data.password);
+          setUser(loggedIn);
           return;
+        } catch (err) {
+          if (err instanceof TypeError && err.message.includes("fetch")) {
+            const demoUser: User = {
+              ...DEV_DEMO_SEEKER,
+              email: data.email,
+              firstName: data.firstName,
+              lastName: data.lastName,
+              personalStatement:
+                data.personalStatement || DEV_DEMO_SEEKER.personalStatement,
+            };
+            setUser(demoUser);
+            toast.info("[Dev] Backend unreachable — registered in demo mode.", {
+              duration: 5000,
+            });
+            return;
+          }
+          throw err;
         }
-        throw err;
       }
+
+      await api.registerJobSeeker(data);
+      const loggedIn = await api.loginJobSeeker(data.email, data.password);
+      setUser(loggedIn);
     },
     [],
   );
@@ -258,45 +223,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       description?: string;
       logoUrl?: string;
     }) => {
-      try {
-        await api.registerCompanyRecruiter(data);
-        const loggedIn = await api.loginCompanyRecruiter(
-          data.email,
-          data.password,
-        );
-        setUser(loggedIn);
-        setIsOffline(false);
-      } catch (err) {
-        const isNetworkError =
-          err instanceof TypeError && err.message.includes("fetch");
-        if (isNetworkError) {
-          const demoUser: User = {
-            ...DEFAULT_DEMO_RECRUITER,
-            email: data.email,
-            companyName: data.companyName,
-            organizationNumber: data.organizationNumber,
-            phoneNumber: data.phoneNumber,
-            description: data.description,
-          };
-          setUser(demoUser);
-          saveOfflineUser(demoUser);
-          setIsOffline(true);
-          toast.info("Backend unavailable — registered in demo/offline mode.", {
-            duration: 5000,
-          });
+      if (import.meta.env.DEV) {
+        try {
+          await api.registerCompanyRecruiter(data);
+          const loggedIn = await api.loginCompanyRecruiter(
+            data.email,
+            data.password,
+          );
+          setUser(loggedIn);
           return;
+        } catch (err) {
+          if (err instanceof TypeError && err.message.includes("fetch")) {
+            const demoUser: User = {
+              ...DEV_DEMO_RECRUITER,
+              email: data.email,
+              companyName: data.companyName,
+              organizationNumber: data.organizationNumber,
+              phoneNumber: data.phoneNumber,
+              description: data.description,
+            };
+            setUser(demoUser);
+            toast.info("[Dev] Backend unreachable — registered in demo mode.", {
+              duration: 5000,
+            });
+            return;
+          }
+          throw err;
         }
-        throw err;
       }
+
+      await api.registerCompanyRecruiter(data);
+      const loggedIn = await api.loginCompanyRecruiter(
+        data.email,
+        data.password,
+      );
+      setUser(loggedIn);
     },
     [],
   );
 
   const logout = useCallback(() => {
-    api.logout();
-    clearOfflineUser();
+    api.logout().catch(() => {
+      // Ignore network errors on logout — session hint is already cleared
+    });
     setUser(null);
-    setIsOffline(false);
   }, []);
 
   const refreshProfile = useCallback(async () => {
@@ -313,9 +283,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             freshUser = await api.getJobSeeker(currentUser.id);
           }
           setUser((prev) => (prev ? { ...prev, ...freshUser } : prev));
-          setIsOffline(false);
         } catch (error) {
-          console.warn("Failed to refresh profile (offline?):", error);
+          if (import.meta.env.DEV) {
+            console.warn("Failed to refresh profile:", error);
+          }
         }
       })();
 
@@ -327,32 +298,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (data: Record<string, unknown>) => {
       if (!user) throw new Error("Not authenticated");
 
-      // Always update locally
-      const merged = { ...user, ...data } as User;
-      setUser(merged);
+      // Optimistic update
+      setUser((prev) => (prev ? { ...prev, ...data } : prev));
 
-      if (isOffline) {
-        saveOfflineUser(merged);
-        return;
+      let updated: User;
+      if (user.role === "COMPANY_RECRUITER") {
+        updated = await api.updateCompanyRecruiter(user.id, data);
+      } else {
+        updated = await api.updateJobSeeker(user.id, data);
       }
-
-      try {
-        let updated: User;
-        if (user.role === "COMPANY_RECRUITER") {
-          updated = await api.updateCompanyRecruiter(user.id, data);
-        } else {
-          updated = await api.updateJobSeeker(user.id, data);
-        }
-        setUser((prev) => (prev ? { ...prev, ...updated } : prev));
-      } catch {
-        // Save offline
-        saveOfflineUser(merged);
-        toast.info(
-          "Changes saved locally. They'll sync when the server is available.",
-        );
-      }
+      setUser((prev) => (prev ? { ...prev, ...updated } : prev));
     },
-    [user, isOffline],
+    [user],
   );
 
   return (
@@ -362,7 +319,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         isAuthenticated: !!user,
         isEmployer: user?.role === "COMPANY_RECRUITER",
-        isOffline,
         login,
         registerJobSeeker,
         registerCompanyRecruiter,

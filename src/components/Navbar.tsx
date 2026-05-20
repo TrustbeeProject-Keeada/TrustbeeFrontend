@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, Briefcase, MessageSquare, Bookmark, User, LayoutDashboard, PlusCircle, LogOut, ClipboardList } from "lucide-react";
+import { Menu, X, Briefcase, Bookmark, User, LayoutDashboard, PlusCircle, LogOut, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,7 +15,6 @@ export function Navbar() {
   const seekerLinks = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { to: "/jobs", label: "Jobs", icon: Briefcase },
-    { to: "/messages", label: "Messages", icon: MessageSquare },
     { to: "/saved", label: "Saved", icon: Bookmark },
     { to: "/profile", label: "Profile", icon: User },
   ];
@@ -24,7 +23,6 @@ export function Navbar() {
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { to: "/manage-jobs", label: "My Jobs", icon: ClipboardList },
     { to: "/create-job", label: "Post Job", icon: PlusCircle },
-    { to: "/messages", label: "Messages", icon: MessageSquare },
     { to: "/profile", label: "Profile", icon: User },
   ];
 

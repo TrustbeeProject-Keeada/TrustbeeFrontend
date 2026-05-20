@@ -16,7 +16,7 @@ const features = [
 const steps = [
   { num: "01", title: "Create Your Profile", desc: "Sign up and fill in your experience, education, and upload your CV." },
   { num: "02", title: "Discover Opportunities", desc: "Search jobs or post positions. Let our AI help match the perfect fit." },
-  { num: "03", title: "Connect & Succeed", desc: "Message directly, apply with one click, and land your next role." },
+  { num: "03", title: "Connect & Succeed", desc: "Apply with one click, track your applications, and land your next role." },
 ];
 
 export default function Index() {

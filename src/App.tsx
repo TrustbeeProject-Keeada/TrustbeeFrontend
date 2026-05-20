@@ -21,7 +21,6 @@ import JobDetail from "./pages/JobDetail";
 import CreateJob from "./pages/CreateJob";
 import EditJob from "./pages/EditJob";
 import ManageJobs from "./pages/ManageJobs";
-import Messages from "./pages/Messages";
 import Saved from "./pages/Saved";
 import AIAssistant from "./pages/AIAssistant";
 import Support from "./pages/Support";
@@ -55,7 +54,6 @@ const App = () => (
                     <Route path="/create-job" element={<ProtectedRoute><CreateJob /></ProtectedRoute>} />
                     <Route path="/edit-job/:id" element={<ProtectedRoute><EditJob /></ProtectedRoute>} />
                     <Route path="/manage-jobs" element={<ProtectedRoute><ManageJobs /></ProtectedRoute>} />
-                    <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
                     <Route path="/saved" element={<ProtectedRoute><Saved /></ProtectedRoute>} />
                     <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
                     <Route path="/support" element={<Support />} />

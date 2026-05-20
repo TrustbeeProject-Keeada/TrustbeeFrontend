@@ -9,6 +9,7 @@ import {
   Download,
   Loader2,
   Eye,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,19 +21,20 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { CvBuilder } from "@/components/CvBuilder";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 export default function Profile() {
-  const { user, updateProfile, refreshProfile, setUser } = useAuth();
+  const { user, updateProfile, refreshProfile, setUser, logout } = useAuth();
+  const navigate = useNavigate();
   const isRecruiter = user?.role === "COMPANY_RECRUITER";
-
-  // User is already loaded from AuthContext on app mount, no need to refresh here
-  // Fetching happens in AuthProvider on app boot
 
   // Job seeker fields
   const [firstName, setFirstName] = useState(user?.firstName || "");
@@ -56,10 +58,15 @@ export default function Profile() {
 
   const [saving, setSaving] = useState(false);
   const [uploadingCv, setUploadingCv] = useState(false);
+  const [uploadingPicture, setUploadingPicture] = useState(false);
   const [cvPreviewOpen, setCvPreviewOpen] = useState(false);
-  const cvInputRef = useRef<HTMLInputElement>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  // Sync form fields when user data updates (e.g. after fresh fetch)
+  const cvInputRef = useRef<HTMLInputElement>(null);
+  const pictureInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync form fields when user data updates
   useEffect(() => {
     if (!user) return;
     setFirstName(user.firstName || "");
@@ -78,6 +85,39 @@ export default function Profile() {
     setLogoUrl(user.logoUrl || "");
   }, [user]);
 
+  const handlePictureUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image too large. Maximum size is 2 MB.");
+      return;
+    }
+    setUploadingPicture(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+      });
+      await api.updateJobSeeker(user.id, { profilePicture: base64 });
+      setUser({ ...user, profilePicture: base64 });
+      toast.success("Profile picture updated!");
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      toast.error(error.message || "Failed to upload picture.");
+    } finally {
+      setUploadingPicture(false);
+      if (pictureInputRef.current) pictureInputRef.current.value = "";
+    }
+  };
+
   const handleCvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -86,7 +126,7 @@ export default function Profile() {
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("File too large. Maximum size is 5MB.");
+      toast.error("File too large. Maximum size is 5 MB.");
       return;
     }
     setUploadingCv(true);
@@ -97,24 +137,15 @@ export default function Profile() {
         reader.onerror = () => reject(new Error("Failed to read file"));
         reader.readAsDataURL(file);
       });
-
-      // Update user locally immediately so UI reflects the change
+      await api.updateJobSeeker(user.id, { cv: base64 });
       setUser({ ...user, cv: base64 });
       toast.success("CV uploaded successfully!");
-
-      // Try to persist to backend (non-blocking)
-      try {
-        await api.updateJobSeeker(user.id, { cv: base64 });
-        await refreshProfile();
-      } catch (apiErr) {
-        console.warn("CV saved locally but failed to sync to server:", apiErr);
-        toast.info("CV loaded locally. It will sync when the server is available.");
-      }
-    } catch {
-      toast.error("Failed to read the PDF file.");
+      await refreshProfile();
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      toast.error(error.message || "Failed to upload CV.");
     } finally {
       setUploadingCv(false);
-      // Reset the input so re-uploading the same file triggers onChange
       if (cvInputRef.current) cvInputRef.current.value = "";
     }
   };
@@ -125,6 +156,26 @@ export default function Profile() {
     link.href = user.cv;
     link.download = `${user.firstName || "my"}_cv.pdf`;
     link.click();
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    setDeleting(true);
+    try {
+      if (user.role === "COMPANY_RECRUITER") {
+        await api.deleteCompanyRecruiter(user.id);
+      } else {
+        await api.deleteJobSeeker(user.id);
+      }
+      logout();
+      navigate("/");
+      toast.success("Your account has been deleted.");
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      toast.error(error.message || "Failed to delete account.");
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+    }
   };
 
   const initials = isRecruiter
@@ -196,12 +247,35 @@ export default function Profile() {
                   />
                 ) : (
                   <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-2xl font-bold text-primary">
-                    {initials}
+                    {uploadingPicture ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      initials
+                    )}
                   </div>
                 )}
-                <button className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md hover:bg-accent/90 active:scale-95 transition-transform">
-                  <Camera className="h-3.5 w-3.5" />
-                </button>
+                {/* Camera button — job seekers only; recruiters use the Logo URL field */}
+                {!isRecruiter && (
+                  <button
+                    type="button"
+                    disabled={uploadingPicture}
+                    onClick={() => pictureInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md hover:bg-accent/90 active:scale-95 transition-transform disabled:opacity-50"
+                  >
+                    {uploadingPicture ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Camera className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                )}
+                <input
+                  ref={pictureInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handlePictureUpload}
+                />
               </div>
               <div className="flex-1 text-center sm:text-left">
                 <h2 className="text-lg font-semibold">
@@ -222,7 +296,6 @@ export default function Profile() {
                   {isRecruiter ? "Company Recruiter" : "Job Seeker"}
                 </span>
               </div>
-              {/* CV Preview button — only for job seekers with a CV */}
               {!isRecruiter && user?.cv && (
                 <Button
                   type="button"
@@ -254,6 +327,40 @@ export default function Profile() {
               />
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Account Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete account</DialogTitle>
+            <DialogDescription>
+              This will permanently delete your account and all associated data.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              Delete my account
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -488,9 +595,7 @@ export default function Profile() {
                     )}
                   </div>
                   {user?.cv && (
-                    <p className="text-xs text-muted-foreground">
-                      ✓ CV on file
-                    </p>
+                    <p className="text-xs text-muted-foreground">✓ CV on file</p>
                   )}
                 </CardContent>
               </Card>
@@ -498,7 +603,7 @@ export default function Profile() {
           </>
         )}
 
-        <ScrollReveal delay={240}>
+        <ScrollReveal delay={280}>
           <Button
             type="submit"
             disabled={saving}
@@ -507,6 +612,31 @@ export default function Profile() {
           >
             {saving ? "Saving…" : "Save Changes"}
           </Button>
+        </ScrollReveal>
+
+        {/* Danger zone */}
+        <ScrollReveal delay={320}>
+          <Card className="glass border-destructive/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive text-base">
+                <Trash2 className="h-4 w-4" /> Danger Zone
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex items-center justify-between gap-4">
+              <p className="text-sm text-muted-foreground">
+                Permanently delete your account and all associated data.
+              </p>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                className="shrink-0"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                Delete account
+              </Button>
+            </CardContent>
+          </Card>
         </ScrollReveal>
       </form>
     </div>

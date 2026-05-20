@@ -152,38 +152,12 @@ export default function EvaluationWheel({ jobId }: { jobId: number | string }) {
   const [score, setScore] = useState<number | null>(null);
   const [explanation, setExplanation] = useState<string | undefined>(undefined);
 
-  // Helper: try to extract user id from JWT fallback if AuthContext is not populated
-  const getUserIdFromToken = (): number | null => {
-    try {
-      const token = localStorage.getItem("trustbee_token");
-      if (!token) return null;
-      const parts = token.split(".");
-      if (parts.length < 2) return null;
-      const payload = JSON.parse(
-        atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")),
-      );
-      // Common fields: id, sub, userId
-      if (typeof payload.id === "number") return payload.id;
-      if (typeof payload.userId === "number") return payload.userId;
-      if (typeof payload.sub === "number") return payload.sub;
-      // sometimes id is string
-      if (typeof payload.id === "string" && !Number.isNaN(Number(payload.id)))
-        return Number(payload.id);
-    } catch (e) {
-      // ignore
-    }
-    return null;
-  };
-
-  // Fetch matchmake result on mount (when job is shown). This ensures the evaluation is
-  // generated automatically when the job is viewed/posted rather than on user click.
   useEffect(() => {
     let mounted = true;
     const fetchOnce = async () => {
       if (!jobId) return;
 
-      // Prefer AuthContext user id, fallback to token parsing
-      const userId = user?.id ?? getUserIdFromToken();
+      const userId = user?.id;
       if (!userId) {
         // Do not call if we can't determine a user id
         return;

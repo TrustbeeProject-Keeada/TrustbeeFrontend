@@ -213,13 +213,6 @@ export default function JobDetail() {
                   {applying ? "Applying…" : "Apply Now"}
                 </Button>
               )}
-              <Button
-                variant="outline"
-                onClick={() => navigate("/messages")}
-                className="active:scale-[0.97] transition-transform"
-              >
-                Message Employer
-              </Button>
               {user?.role === "JOB_SEEKER" && job && (
                 <EvaluationWheel jobId={job.id} />
               )}

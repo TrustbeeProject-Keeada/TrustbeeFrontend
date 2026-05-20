@@ -1,9 +1,10 @@
 /**
- * TrustBee — API layer connected to real backend.
- * Token stored in localStorage; user data fetched fresh each session.
+ * TrustBee — API layer.
+ * Auth is handled via httpOnly cookies (set by the backend on login).
+ * Minimal session info (id, role) is kept in localStorage only to know
+ * which profile endpoint to call on page load — never the raw token.
  */
 
-// ━━━ API Base URL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
 
@@ -14,7 +15,6 @@ export interface User {
   id: number;
   email: string;
   role: UserRole;
-  token: string;
   // Job seeker fields
   firstName?: string;
   lastName?: string;
@@ -58,7 +58,7 @@ export interface Job {
   company: JobCompany;
   employmentType?: string;
   salaryType?: string;
-  source?: "trustbee" | "job_bank"; // Track which API the job came from
+  source?: "trustbee" | "job_bank";
 }
 
 export interface JobsResponse {
@@ -97,16 +97,6 @@ export interface Application {
     email: string;
     phoneNumber?: string;
   };
-}
-
-export interface Message {
-  id: number;
-  content: string;
-  senderJobSeekerId?: number;
-  senderRecruiterId?: number;
-  receiverJobSeekerId?: number;
-  receiverRecruiterId?: number;
-  createdAt: string;
 }
 
 export interface SavedJobEntry {
@@ -148,12 +138,23 @@ export interface LoginRequest {
 
 export type UpdateProfileRequest = Record<string, unknown>;
 
-// ━━━ Storage keys ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const TOKEN_KEY = "trustbee_token";
-// Minimal login info stored temporarily to bootstrap the session
-const LOGIN_INFO_KEY = "trustbee_login_info";
+// ━━━ Global 401 handler ━━━━━━━━━━━━━━━━━━━━━━━━
+// AuthContext registers this so any expired-session response clears the user
+// immediately — ProtectedRoute then redirects to /login automatically.
+let _onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: () => void) {
+  _onUnauthorized = fn;
+}
 
-// ━━━ API helper ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ━━━ Session hint stored in localStorage (id + role only, never the token) ━━━
+const SESSION_KEY = "trustbee_session";
+
+interface SessionHint {
+  id: number;
+  role: UserRole;
+}
+
+// ━━━ Error class ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -162,25 +163,24 @@ export class ApiError extends Error {
   }
 }
 
+// ━━━ Core fetch wrapper ━━━━━━━━━━━━━━━━━━━━━━━━━
 async function apiCall<T = unknown>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = localStorage.getItem(TOKEN_KEY);
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
+    credentials: "include", // send httpOnly cookie on every request
     headers: {
-      ...headers,
+      "Content-Type": "application/json",
       ...((options.headers as Record<string, string>) || {}),
     },
   });
 
   if (!res.ok) {
+    if (res.status === 401 && _onUnauthorized) {
+      _onUnauthorized();
+    }
     let msg = `Request failed (${res.status})`;
     try {
       const body = await res.json();
@@ -195,29 +195,18 @@ async function apiCall<T = unknown>(
   return res.json();
 }
 
-// ━━━ Minimal login info (id, role, token) ━━━━━━━
-interface LoginInfo {
-  id: number;
-  role: UserRole;
-  token: string;
-}
-
 // ━━━ API methods ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export const api = {
   // ── Auth ──────────────────────────────────────
   async loginJobSeeker(email: string, password: string): Promise<User> {
     const data = await apiCall<{ status: string; jobseeker: User }>(
       "/auth/loginjobseeker",
-      {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      },
+      { method: "POST", body: JSON.stringify({ email, password }) },
     );
     const user = data.jobseeker;
-    localStorage.setItem(TOKEN_KEY, user.token);
     localStorage.setItem(
-      LOGIN_INFO_KEY,
-      JSON.stringify({ id: user.id, role: user.role, token: user.token }),
+      SESSION_KEY,
+      JSON.stringify({ id: user.id, role: user.role } satisfies SessionHint),
     );
     return user;
   },
@@ -225,16 +214,12 @@ export const api = {
   async loginCompanyRecruiter(email: string, password: string): Promise<User> {
     const data = await apiCall<{ status: string; companyRecruiter: User }>(
       "/auth/logincompanyrecruiter",
-      {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      },
+      { method: "POST", body: JSON.stringify({ email, password }) },
     );
     const user = data.companyRecruiter;
-    localStorage.setItem(TOKEN_KEY, user.token);
     localStorage.setItem(
-      LOGIN_INFO_KEY,
-      JSON.stringify({ id: user.id, role: user.role, token: user.token }),
+      SESSION_KEY,
+      JSON.stringify({ id: user.id, role: user.role } satisfies SessionHint),
     );
     return user;
   },
@@ -242,10 +227,7 @@ export const api = {
   async registerJobSeeker(body: RegisterJobSeekerRequest): Promise<User> {
     const data = await apiCall<{ status: string; jobseeker: User }>(
       "/auth/registerjobseeker",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+      { method: "POST", body: JSON.stringify(body) },
     );
     return data.jobseeker;
   },
@@ -253,31 +235,49 @@ export const api = {
   async registerCompanyRecruiter(body: RegisterCompanyRequest): Promise<User> {
     const data = await apiCall<{ status: string; companyRecruiter: User }>(
       "/auth/registercompanyrecruiter",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+      { method: "POST", body: JSON.stringify(body) },
     );
     return data.companyRecruiter;
   },
 
-  logout() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(LOGIN_INFO_KEY);
+  async logout(): Promise<void> {
+    try {
+      await apiCall("/auth/logout", { method: "POST" });
+    } finally {
+      localStorage.removeItem(SESSION_KEY);
+    }
   },
 
-  /** Returns minimal login info (id, role, token) — NOT full user data */
-  getStoredLoginInfo(): LoginInfo | null {
+  async forgotPassword(email: string): Promise<void> {
+    await apiCall("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  async resetPassword(data: {
+    token: string;
+    email: string;
+    role: string;
+    newPassword: string;
+  }): Promise<void> {
+    await apiCall("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  getSessionHint(): SessionHint | null {
     try {
-      const stored = localStorage.getItem(LOGIN_INFO_KEY);
+      const stored = localStorage.getItem(SESSION_KEY);
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
     }
   },
 
-  getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+  clearSession() {
+    localStorage.removeItem(SESSION_KEY);
   },
 
   // ── Job Seekers ───────────────────────────────
@@ -297,10 +297,7 @@ export const api = {
   ): Promise<User> {
     const res = await apiCall<{ status: string; jobseeker: User }>(
       `/jobseekers/${id}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      },
+      { method: "PATCH", body: JSON.stringify(data) },
     );
     return res.jobseeker;
   },
@@ -322,10 +319,7 @@ export const api = {
   ): Promise<User> {
     const res = await apiCall<{ status: string; data: User }>(
       `/companyrecruiter/${id}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      },
+      { method: "PATCH", body: JSON.stringify(data) },
     );
     return res.data;
   },
@@ -353,8 +347,7 @@ export const api = {
     }
     const qs = query.toString();
 
-    // When filtering by company, only fetch from the TrustBee DB — a recruiter's
-    // own jobs cannot exist in the external job bank.
+    // When filtering by company, only fetch from the TrustBee DB.
     if (params?.companyId) {
       const res = await apiCall<JobsResponse>(`/jobs${qs ? `?${qs}` : ""}`);
       return {
@@ -363,7 +356,7 @@ export const api = {
       };
     }
 
-    // For public job browsing, merge TrustBee DB jobs with external job bank jobs.
+    // For public browsing, merge TrustBee DB jobs with external job bank jobs.
     const [trustbeeRes, jobBankRes] = await Promise.all([
       apiCall<JobsResponse>(`/jobs${qs ? `?${qs}` : ""}`),
       apiCall<{
@@ -374,8 +367,6 @@ export const api = {
         meta: { totalJobs: 0, currentPage: 1, totalPages: 1 },
       })),
     ]);
-
-    const trustbeeTotalJobs = trustbeeRes.meta.totalJobs as number;
 
     const trustbeeJobs = trustbeeRes.jobs.map((job) => ({
       ...job,
@@ -389,7 +380,7 @@ export const api = {
     return {
       jobs: [...trustbeeJobs, ...bankJobs],
       meta: {
-        totalJobs: trustbeeTotalJobs + jobBankRes.meta.totalJobs,
+        totalJobs: trustbeeRes.meta.totalJobs + jobBankRes.meta.totalJobs,
         currentPage: trustbeeRes.meta.currentPage,
         totalPages: trustbeeRes.meta.totalPages,
       },
@@ -400,8 +391,6 @@ export const api = {
     id: number | string,
     source?: "trustbee" | "job_bank",
   ): Promise<Job> {
-    // Numeric IDs (including numeric strings like "42") belong to the TrustBee DB.
-    // Non-numeric strings are job bank UUIDs/slugs.
     const isNumericId = !isNaN(Number(id)) && String(id).trim() !== "";
     const endpoint =
       source === "job_bank" || (!isNumericId && source !== "trustbee")
@@ -412,7 +401,6 @@ export const api = {
       endpoint,
     );
 
-    // Handle different response formats
     if ("data" in response) return (response as { data: Job }).data;
     if ("job" in response) return (response as { job: Job }).job;
     return response as Job;
@@ -451,10 +439,7 @@ export const api = {
   ): Promise<Job> {
     const res = await apiCall<{ status: string; data: Job }>(
       `/jobs/${id}/status`,
-      {
-        method: "PATCH",
-        body: JSON.stringify({ status }),
-      },
+      { method: "PATCH", body: JSON.stringify({ status }) },
     );
     return res.data;
   },
@@ -463,9 +448,7 @@ export const api = {
   async applyToJob(jobId: number | string): Promise<Application> {
     const res = await apiCall<{ status: string; data: Application }>(
       `/applications/job/${jobId}`,
-      {
-        method: "POST",
-      },
+      { method: "POST" },
     );
     return res.data;
   },
@@ -483,43 +466,9 @@ export const api = {
   ): Promise<Application> {
     const res = await apiCall<{ status: string; data: Application }>(
       `/applications/${applicationId}/status`,
-      {
-        method: "PATCH",
-        body: JSON.stringify({ status }),
-      },
+      { method: "PATCH", body: JSON.stringify({ status }) },
     );
     return res.data;
-  },
-
-  // ── Messages ─────────────────────────────────
-  async sendMessage(
-    content: string,
-    receiverId: number,
-    receiverRole: "JOB_SEEKER" | "COMPANY_RECRUITER",
-  ): Promise<Message> {
-    const res = await apiCall<{ status: string; data: Message }>("/messages", {
-      method: "POST",
-      body: JSON.stringify({ content, receiverId, receiverRole }),
-    });
-    return res.data;
-  },
-
-  async getReceivedMessages(): Promise<Message[]> {
-    const res = await apiCall<{
-      status: string;
-      results: number;
-      data: { messages: Message[] };
-    }>("/messages/received");
-    return res.data.messages;
-  },
-
-  async getConversation(otherId: number, role: string): Promise<Message[]> {
-    const res = await apiCall<{
-      status: string;
-      results: number;
-      data: { messages: Message[] };
-    }>(`/messages/${otherId}?role=${role}`);
-    return res.data.messages;
   },
 
   // ── Saved ────────────────────────────────────
@@ -568,14 +517,14 @@ export const api = {
   },
 
   // ── AI / Matchmaking ─────────────────────────
-  async matchmake(jobAddId: number | string, jobseekerId: number): Promise<unknown> {
-    const res = await apiCall<{ status: string; data: unknown }>(
-      "/matchmake",
-      {
-        method: "POST",
-        body: JSON.stringify({ jobAddId: Number(jobAddId), jobseekerId }),
-      },
-    );
+  async matchmake(
+    jobAddId: number | string,
+    jobseekerId: number,
+  ): Promise<unknown> {
+    const res = await apiCall<{ status: string; data: unknown }>("/matchmake", {
+      method: "POST",
+      body: JSON.stringify({ jobAddId: Number(jobAddId), jobseekerId }),
+    });
     return res.data;
   },
 
@@ -601,4 +550,3 @@ export const api = {
     return res.data;
   },
 };
-
