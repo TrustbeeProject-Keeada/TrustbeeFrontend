@@ -19,11 +19,12 @@ import {
   getPasswordErrorMessage,
 } from "@/lib/validation";
 import logo from "@/assets/trustbee-logo.png";
+import { CvOnboardingStep } from "@/components/CvOnboardingStep";
 
 type RoleChoice = "JOB_SEEKER" | "COMPANY_RECRUITER";
 
 export default function Register() {
-  const { registerJobSeeker, registerCompanyRecruiter } = useAuth();
+  const { registerJobSeeker, registerCompanyRecruiter, user } = useAuth();
   const navigate = useNavigate();
 
   const [role, setRole] = useState<RoleChoice>("JOB_SEEKER");
@@ -44,6 +45,9 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [emailError, setEmailError] = useState("");
+
+  // After job seeker registration, move to CV step
+  const [cvStep, setCvStep] = useState(false);
 
   const handlePasswordChange = (value: string) => {
     setPassword(value);
@@ -67,13 +71,11 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate email
     if (!email || !isValidEmail(email)) {
       toast.error("Please enter a valid email address");
       return;
     }
 
-    // Validate password
     const passwordValidation = validatePassword(password);
     if (!passwordValidation.isValid) {
       toast.error(getPasswordErrorMessage(passwordValidation));
@@ -95,8 +97,8 @@ export default function Register() {
           password,
           phoneNumber: jobSeekerPhone || undefined,
         });
-        toast.success("Account created!");
-        navigate("/dashboard");
+        toast.success("Account created! Now let's build your CV.");
+        setCvStep(true);
       } else {
         if (!companyName || !organizationNumber || !phoneNumber) {
           toast.error("Please fill in company name, org number, and phone");
@@ -122,6 +124,29 @@ export default function Register() {
       setLoading(false);
     }
   };
+
+  // Job seeker step 2 — CV onboarding
+  if (cvStep && user && user.role === "JOB_SEEKER") {
+    return (
+      <div className="min-h-[80vh] bg-muted/20 py-8">
+        <ScrollReveal>
+          <div className="mx-auto flex max-w-2xl flex-col items-center px-4">
+            <div className="mb-6 flex items-center gap-3">
+              <img src={logo} alt="TrustBee" className="h-10 w-10 rounded-xl" />
+              <span className="text-lg font-bold">TrustBee</span>
+            </div>
+          </div>
+          <CvOnboardingStep
+            userId={user.id}
+            firstName={user.firstName ?? firstName}
+            lastName={user.lastName ?? lastName}
+            email={user.email ?? email}
+            phone={user.phoneNumber ?? jobSeekerPhone}
+          />
+        </ScrollReveal>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-[80vh] items-center justify-center px-4 py-16">
@@ -238,8 +263,11 @@ export default function Register() {
                 type="email"
                 placeholder="you@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => handleEmailChange(e.target.value)}
               />
+              {emailError && (
+                <p className="text-xs text-destructive">{emailError}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password * (min 8 characters)</Label>
@@ -248,15 +276,25 @@ export default function Register() {
                 type="password"
                 placeholder="At least 8 characters"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => handlePasswordChange(e.target.value)}
               />
+              {passwordError && (
+                <p className="text-xs text-destructive">{passwordError}</p>
+              )}
             </div>
+
+            {role === "JOB_SEEKER" && (
+              <p className="text-xs text-muted-foreground rounded-lg bg-muted/50 px-3 py-2">
+                After creating your account you'll have the option to generate your CV with AI — no extra pages needed.
+              </p>
+            )}
+
             <Button
               type="submit"
               disabled={loading}
               className="w-full bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.97] transition-transform"
             >
-              {loading ? "Creating…" : "Create account"}
+              {loading ? "Creating…" : role === "JOB_SEEKER" ? "Create account & continue" : "Create account"}
             </Button>
           </form>
           <p className="mt-6 text-center text-sm text-muted-foreground">

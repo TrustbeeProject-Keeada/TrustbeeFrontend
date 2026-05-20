@@ -99,6 +99,19 @@ export interface Application {
   };
 }
 
+export interface MyApplication {
+  id: number;
+  status: "PENDING" | "REVIEWED" | "ACCEPTED" | "REJECTED";
+  appliedAt: string;
+  job: {
+    id: number;
+    title: string;
+    city?: string;
+    country?: string;
+    company: { id: number; companyName: string; logoUrl?: string };
+  };
+}
+
 export interface SavedJobEntry {
   id: number;
   savedAt: string;
@@ -547,6 +560,26 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     });
+    return res.data;
+  },
+
+  async generateJobDescription(body: {
+    title: string;
+    responsibilities: string;
+    requirements: string;
+    location?: string;
+    employmentType?: string;
+    additionalInfo?: string;
+  }): Promise<{ description: string }> {
+    const res = await apiCall<{ status: string; data: { description: string } }>(
+      "/generate-job-description",
+      { method: "POST", body: JSON.stringify(body) },
+    );
+    return res.data;
+  },
+
+  async getMyApplications(): Promise<MyApplication[]> {
+    const res = await apiCall<{ status: string; data: MyApplication[] }>("/applications/my");
     return res.data;
   },
 };
